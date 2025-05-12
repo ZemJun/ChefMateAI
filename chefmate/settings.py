@@ -37,7 +37,16 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # My Apps
+    'users.apps.UsersConfig',
+    'recipes.apps.RecipesConfig', # 新增 recipes 应用
+
+    # Third Party Apps (如果后续有，可以放在这里)
+    'rest_framework', # Django REST framework
+    'rest_framework_simplejwt', # JWT
 ]
+
+AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -77,7 +86,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql', # 告诉 Django 我们用的是 PostgreSQL
         'NAME': 'chefmate_db',                      # 你在 pgAdmin 中创建的数据库名字
         'USER': 'chefmate_user',                    # 你在 pgAdmin 中创建的数据库用户名
-        'PASSWORD': 'admin',            # 上面那个用户的密码
+        'PASSWORD': 'admin',                        # 上面那个用户的密码
         'HOST': 'localhost',                        # 数据库服务器地址，本地一般是 localhost 或 127.0.0.1
         'PORT': '5432',                             # PostgreSQL 的默认端口号
     }
