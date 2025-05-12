@@ -1,6 +1,6 @@
 # recipes\admin.py
 from django.contrib import admin
-from .models import Ingredient, DietaryPreferenceTag, Recipe ,RecipeIngredient 
+from .models import Ingredient, DietaryPreferenceTag, Recipe ,RecipeIngredient ,Review 
 
 @admin.register(Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
@@ -47,3 +47,26 @@ class RecipeAdmin(admin.ModelAdmin):
     )
     
     inlines = [RecipeIngredientInline] # 将 RecipeIngredientInline 添加到 RecipeAdmin
+    
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ('recipe', 'user', 'rating', 'comment_summary', 'created_at', 'updated_at')
+    list_filter = ('rating', 'user', 'recipe__title') # 按评分、用户、菜谱标题过滤
+    search_fields = ('recipe__title', 'user__username', 'comment')
+    autocomplete_fields = ['recipe', 'user'] # 方便选择菜谱和用户
+    readonly_fields = ('created_at', 'updated_at') # 创建和更新时间通常只读
+    date_hierarchy = 'created_at' # 按创建时间进行日期层级导航
+
+    # fieldsets 可以用来组织编辑页面的字段
+    fieldsets = (
+        (None, {'fields': ('recipe', 'user')}),
+        ('Review Details', {'fields': ('rating', 'comment')}),
+        ('Timestamps', {'fields': ('created_at', 'updated_at')}),
+    )
+
+    # 自定义一个方法在列表页显示评论摘要
+    def comment_summary(self, obj):
+        if obj.comment:
+            return obj.comment[:50] + '...' if len(obj.comment) > 50 else obj.comment
+        return "-"
+    comment_summary.short_description = "评论摘要" # 设置列的显示名称

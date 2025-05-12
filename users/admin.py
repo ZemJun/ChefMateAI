@@ -1,57 +1,56 @@
+# users/admin.py
+
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin as BaseUserAdmin # 重命名以避免冲突
-from .models import User
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.utils.translation import gettext_lazy as _
+from .models import User, UserInventoryItem, ShoppingListItem # 导入所有需要注册的模型
 
 class UserAdmin(BaseUserAdmin):
-    # fieldsets 定义了在编辑用户时，表单中字段的分组和顺序
-    # 我们需要在现有的 fieldsets 基础上增加我们的自定义字段
-    # BaseUserAdmin.fieldsets 是一个元组，每个元素也是一个元组 (组名, {'fields': (字段1, 字段2, ...)})
-    
-    # 查看 BaseUserAdmin.fieldsets 的默认结构可以帮助我们决定把新字段放在哪里
-    # 默认通常有 'Personal info', 'Permissions', 'Important dates' 等组
-    # 我们可以选择将自定义字段加入 'Personal info' 组，或者创建一个新组
-    
-    # 方式一：加入到 'Personal info' 组
-    # 找到 'Personal info' 组并添加字段
-    # 注意：BaseUserAdmin.fieldsets 是元组，元组不可直接修改，需要重建
-    
-    # 我们需要复制并修改原始的fieldsets
-    # 原始的UserAdmin.fieldsets大概是这样的（版本不同可能略有差异）：
-    # (
-    #     (None, {'fields': ('username', 'password')}),
-    #     (_('Personal info'), {'fields': ('first_name', 'last_name', 'email')}),
-    #     (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
-    #     (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
-    # )
-    # 我们想把 nickname 和 avatar_url 加到 'Personal info' 字段组里
-
-    # 我们可以通过重新定义 fieldsets 来包含我们的字段
-    # 为了国际化，Django Admin 常用 gettext_lazy as _
-    from django.utils.translation import gettext_lazy as _
-
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
-        (_('Personal info'), {'fields': ('first_name', 'last_name', 'email', 'nickname', 'avatar_url')}), # 在这里添加
+        (_('Personal info'), {'fields': ('first_name', 'last_name', 'email', 'nickname', 'avatar_url')}),
+        # 将饮食偏好和不吃食材的字段组添加到用户编辑页面
+        (_('Preferences'), {'fields': ('dietary_preferences', 'disliked_ingredients')}),
         (_('Permissions'), {
             'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
         }),
         (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
     )
-
-    # add_fieldsets 定义了在添加新用户时，表单中字段的分组和顺序
-    # 我们也需要在这里添加自定义字段，如果希望创建用户时就能填的话
+    # 在创建用户页面也添加这些自定义字段
     add_fieldsets = BaseUserAdmin.add_fieldsets + (
         (_('Custom Fields'), {'fields': ('nickname', 'avatar_url')}),
+        (_('Preferences'), {'fields': ('dietary_preferences', 'disliked_ingredients')}),
     )
-
-    # list_display 定义了在用户列表页显示的字段
     list_display = ('username', 'email', 'nickname', 'first_name', 'last_name', 'is_staff')
-    
-    # 如果希望列表页的 nickname 可编辑 (不推荐直接在列表页编辑太多内容)
-    # list_editable = ('nickname',)
-
-    # 如果希望可以根据 nickname 搜索
     search_fields = BaseUserAdmin.search_fields + ('nickname',)
+    # 为 ManyToManyField 使用 filter_horizontal 以获得更好的用户体验
+    filter_horizontal = ('groups', 'user_permissions', 'dietary_preferences', 'disliked_ingredients')
+
+admin.site.register(User, UserAdmin)
 
 
-admin.site.register(User, UserAdmin) # 注册时使用我们自定义的 UserAdmin
+@admin.register(UserInventoryItem)
+class UserInventoryItemAdmin(admin.ModelAdmin):
+    list_display = ('user', 'ingredient', 'notes', 'added_at')
+    list_filter = ('user', 'ingredient__name') # 按食材名称过滤会更直观
+    search_fields = ('user__username', 'ingredient__name', 'notes')
+    autocomplete_fields = ['user', 'ingredient']
+    date_hierarchy = 'added_at' # 添加日期层级导航
+
+@admin.register(ShoppingListItem)
+class ShoppingListItemAdmin(admin.ModelAdmin):
+    list_display = ('user', 'ingredient', 'quantity', 'unit', 'is_purchased', 'related_recipe', 'added_at')
+    list_filter = ('user', 'is_purchased', 'ingredient__name', 'related_recipe__title')
+    search_fields = ('user__username', 'ingredient__name', 'related_recipe__title')
+    list_editable = ('is_purchased', 'quantity', 'unit') # 允许在列表页编辑更多字段
+    autocomplete_fields = ['user', 'ingredient', 'related_recipe']
+    date_hierarchy = 'added_at'
+    actions = ['mark_as_purchased', 'mark_as_not_purchased']
+
+    def mark_as_purchased(self, request, queryset):
+        queryset.update(is_purchased=True)
+    mark_as_purchased.short_description = "标记所选项为 已购买"
+
+    def mark_as_not_purchased(self, request, queryset):
+        queryset.update(is_purchased=False)
+    mark_as_not_purchased.short_description = "标记所选项为 未购买"

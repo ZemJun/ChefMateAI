@@ -41,9 +41,10 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'recipes.apps.RecipesConfig', # 新增 recipes 应用
 
-    # Third Party Apps (如果后续有，可以放在这里)
-    'rest_framework', # Django REST framework
-    'rest_framework_simplejwt', # JWT
+    # Third Party Apps
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist', # 如果需要支持token吊销/刷新后旧token失效
 ]
 
 AUTH_USER_MODEL = 'users.User'
@@ -67,6 +68,7 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
+                "django.template.context_processors.debug", # 建议加上 debug context processor
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
@@ -115,9 +117,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "zh-hans"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "Asia/Shanghai"
 
 USE_I18N = True
 
@@ -133,3 +135,74 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+REST_FRAMEWORK = {
+    # 默认的认证方式：优先使用 JWTAuthentication
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # 如果需要，可以添加其他认证方式，比如 SessionAuthentication 用于浏览器直接访问API
+        # 'rest_framework.authentication.SessionAuthentication', 
+    ),
+    # 默认的权限策略：可以设置为默认需要认证才能访问API
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated', # 默认需要认证
+        # 或者 'rest_framework.permissions.AllowAny', # 默认允许任何人访问 (不推荐全局设置)
+    ],
+    # 默认的分页设置 (如果API返回列表数据)
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10, # 每页默认显示10条记录
+    
+    # 默认的渲染器和解析器
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer', # 默认只支持JSON
+        'rest_framework.renderers.BrowsableAPIRenderer', # 如果希望在浏览器中看到可浏览的API界面
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+    ]
+    
+# DEFAULT_AUTHENTICATION_CLASSES: 定义了 API 请求过来时，DRF 会尝试哪些认证方法。我们将其设置为优先使用 JWTAuthentication。
+# DEFAULT_PERMISSION_CLASSES: 定义了访问 API 的默认权限。IsAuthenticated 表示用户必须登录 (即提供有效的 JWT) 才能访问。对于某些公开的 API (比如获取菜谱列表)，我们可以在具体的视图 (View) 中覆盖这个默认设置。
+# DEFAULT_PAGINATION_CLASS 和 PAGE_SIZE: 如果你的 API 端点返回的是一个列表数据（比如菜谱列表），DRF 可以自动处理分页。这里设置了默认的分页方式和每页大小。
+# DEFAULT_RENDERER_CLASSES 和 DEFAULT_PARSER_CLASSES: 通常 DRF 的默认设置（JSONRenderer, BrowsableAPIRenderer, JSONParser）已经够用，所以这里注释掉了，除非你有特殊需求。BrowsableAPIRenderer 非常有用，它能让在浏览器中直接访问 API 时看到一个友好的、可交互的界面。    
+
+}
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),      # Access Token 的有效期 (例如: 60 分钟)
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),        # Refresh Token 的有效期 (例如: 1 天)
+    'ROTATE_REFRESH_TOKENS': True,                      # 每次使用 Refresh Token 刷新 Access Token 时，是否也返回一个新的 Refresh Token
+    'BLACKLIST_AFTER_ROTATION': True,                   # 如果 ROTATE_REFRESH_TOKENS 为 True, 是否将旧的 Refresh Token 加入黑名单
+                                                        # (需要 INSTALLED_APPS 中有 'rest_framework_simplejwt.token_blacklist')
+    'UPDATE_LAST_LOGIN': True,                         # 登录（获取token）时是否更新 Django User 模型的 last_login 字段
+
+    'ALGORITHM': 'HS256',                               # JWT 签名算法
+    'SIGNING_KEY': SECRET_KEY,                          # 用于签名的密钥，直接使用 Django 的 SECRET_KEY
+    'VERIFYING_KEY': None,                              # 用于验证签名的公钥 (如果使用非对称算法如RS256)
+    'AUDIENCE': None,                                   # JWT 的受众
+    'ISSUER': None,                                     # JWT 的签发者
+    'JWK_URL': None,                                    # JSON Web Key Set URL
+    'LEEWAY': 0,                                        # 允许的时间偏差 (秒)
+
+    'AUTH_HEADER_TYPES': ('Bearer',),                   # HTTP 请求头中用于传递 Token 的认证方案 (例如: "Authorization: Bearer <token>")
+                                                        # 也可设为 ('JWT',)，则为 "Authorization: JWT <token>"
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',           # 存储 Token 的 HTTP 请求头的名称
+    'USER_ID_FIELD': 'id',                              # User 模型中用作用户标识的字段名 (通常是 'id')
+    'USER_ID_CLAIM': 'user_id',                         # JWT payload 中代表用户ID的声明 (claim) 的名称
+    
+    # 自定义用户认证规则
+    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
+
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',), # Access Token 使用的类
+    'TOKEN_TYPE_CLAIM': 'token_type',                   # JWT payload 中代表 Token 类型的声明的名称
+    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser', # 用于从 Token 中重建用户的类
+
+    'JTI_CLAIM': 'jti',                                 # JWT ID (jti) 声明的名称, 用于唯一标识 Token
+
+    # 滑动窗口 Token (Sliding Tokens) - 如果需要 token 自动续期，可以启用
+    # 'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
+    # 'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
+    # 'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
+}

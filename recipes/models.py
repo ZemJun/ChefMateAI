@@ -1,3 +1,4 @@
+# recipes\models.py
 from django.db import models
 from django.conf import settings # 用于引用 AUTH_USER_MODEL
 
@@ -146,3 +147,39 @@ class RecipeIngredient(models.Model):
         # 确保在一个菜谱中，同一种食材只出现一次
         unique_together = ('recipe', 'ingredient')
         ordering = ['recipe', 'id'] # 按菜谱排序，然后在菜谱内按添加顺序
+        
+        
+class Review(models.Model):
+    recipe = models.ForeignKey(
+        Recipe, 
+        on_delete=models.CASCADE, 
+        related_name='reviews', # 从 Recipe 对象访问其所有评价
+        verbose_name="菜谱"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.CASCADE, 
+        related_name='reviews_made', # 从 User 对象访问其发表的所有评价
+        verbose_name="用户"
+    )
+    rating = models.PositiveSmallIntegerField(
+        verbose_name="评分",
+        # 可以使用 validators 来限制评分范围，例如 1 到 5
+        # from django.core.validators import MinValueValidator, MaxValueValidator
+        # validators=[MinValueValidator(1), MaxValueValidator(5)]
+        # 为了简化，暂时不加 validator，但实际项目中推荐加上
+        help_text="评分 (例如1-5星)"
+    )
+    comment = models.TextField(blank=True, null=True, verbose_name="评论内容")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间") # 如果允许编辑
+
+    def __str__(self):
+        return f"Review for {self.recipe.title} by {self.user.username} ({self.rating} stars)"
+
+    class Meta:
+        verbose_name = "菜谱评价"
+        verbose_name_plural = "菜谱评价"
+        # 一个用户对一个菜谱只能评价一次
+        unique_together = ('recipe', 'user')
+        ordering = ['-created_at'] # 最新评价在最前面
