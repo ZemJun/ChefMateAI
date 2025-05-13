@@ -1,36 +1,40 @@
-# recipes\models.py
+# recipes/models.py
 from django.db import models
 from django.conf import settings # 用于引用 AUTH_USER_MODEL
 
 class Ingredient(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="食材名称")
-    
+
     CATEGORY_CHOICES = [
-        ('vegetable', '蔬菜'),
-        ('meat', '肉类'),
-        ('poultry', '禽类'),
-        ('seafood', '海鲜'),
-        ('dairy', '乳制品'),
+        ('vegetable', '蔬菜'),        # （保留，但部分内容会移到新分类）
         ('fruit', '水果'),
-        ('grain', '谷物/主食'),
-        ('spice', '香料/调料'),
-        ('herb', '香草'),
+        ('meat', '肉类'),            # （包括红肉：猪、牛、羊等）
+        ('poultry', '禽类'),          # （鸡、鸭、鹅等）
+        ('seafood', '海鲜'),
+        ('egg', '蛋类'),             # <-- 新增 (从 dairy 中分离)
+        ('dairy', '乳制品'),          # （牛奶、奶酪、黄油等，不含蛋）
+        ('mushroom', '菌菇'),         # <-- 新增 (从 vegetable 中分离)
+        ('legume', '豆类'),           # <-- 新增 (如黄豆、绿豆、扁豆、鹰嘴豆、毛豆等)
+        ('nut_seed', '坚果与籽类'),   # <-- 新增 (花生、核桃、杏仁、芝麻、瓜子等)
+        ('grain', '谷物/主食'),      # （米、面、燕麦、玉米等）
+        ('spice', '香料/调料'),      # （非新鲜香草的干香料、酱料等）
+        ('herb', '香草'),           # （新鲜或干的植物叶、花、茎，如薄荷、罗勒、香菜）
         ('oil', '油类'),
-        ('other', '其他'),
+        ('other', '其他'),           # （酵母、泡打粉、豆腐等不易归入上述明确分类的）
     ]
     category = models.CharField(
-        max_length=50, 
-        choices=CATEGORY_CHOICES, 
-        blank=True, 
-        null=True, 
+        max_length=50,
+        choices=CATEGORY_CHOICES,
+        blank=True, # 允许为空，如果某些食材初期难以分类
+        null=True,  # 数据库中也允许为空
         verbose_name="分类"
     )
     description = models.TextField(blank=True, null=True, verbose_name="描述")
     image_url = models.URLField(blank=True, null=True, verbose_name="图片链接")
     common_substitutes = models.ManyToManyField(
-        'self', 
-        blank=True, 
-        symmetrical=True,
+        'self',
+        blank=True,
+        symmetrical=True, # symmetrical=True 更适合替代品关系，如果是 False 则 A替B 不等于 B替A
         verbose_name="常见替代品"
     )
 
@@ -41,7 +45,7 @@ class Ingredient(models.Model):
         verbose_name = "食材"
         verbose_name_plural = "食材"
         ordering = ['name']
-        
+
 # 注意 DietaryPreferenceTag 的位置，它现在是顶层类，在 Ingredient 外部
 class DietaryPreferenceTag(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="饮食偏好标签名称")
@@ -54,8 +58,8 @@ class DietaryPreferenceTag(models.Model):
         verbose_name = "饮食偏好标签"
         verbose_name_plural = "饮食偏好标签"
         ordering = ['name']
-            
-            
+
+
 class Recipe(models.Model):
     title = models.CharField(max_length=200, verbose_name="菜谱标题")
     description = models.TextField(blank=True, null=True, verbose_name="简介")
@@ -76,26 +80,24 @@ class Recipe(models.Model):
         (3, '困难'),
     ]
     difficulty = models.PositiveSmallIntegerField(
-        choices=DIFFICULTY_CHOICES, 
-        blank=True, 
-        null=True, 
+        choices=DIFFICULTY_CHOICES,
+        blank=True,
+        null=True,
         verbose_name="难度"
     )
     main_image_url = models.URLField(blank=True, null=True, verbose_name="主图链接")
 
-    # ------------------- 在这里添加 ingredients 字段 -------------------
     ingredients = models.ManyToManyField(
-        Ingredient, 
-        through='RecipeIngredient', # 指定使用 RecipeIngredient 作为中间表
-        through_fields=('recipe', 'ingredient'), # 可选但明确
-        related_name='recipes_using_ingredient', 
+        Ingredient,
+        through='RecipeIngredient',
+        through_fields=('recipe', 'ingredient'),
+        related_name='recipes_using_ingredient',
         verbose_name="所需食材"
     )
-    # -----------------------------------------------------------------
-    
+
     dietary_tags = models.ManyToManyField(
-        DietaryPreferenceTag, 
-        blank=True, 
+        DietaryPreferenceTag,
+        blank=True,
         related_name='recipes',
         verbose_name="饮食标签"
     )
@@ -120,18 +122,17 @@ class Recipe(models.Model):
         verbose_name = "菜谱"
         verbose_name_plural = "菜谱"
         ordering = ['-updated_at', 'title']
-        
 
 
 class RecipeIngredient(models.Model):
     recipe = models.ForeignKey(
-        Recipe, 
-        on_delete=models.CASCADE, # 如果菜谱被删除，相关的食材条目也应删除
+        Recipe,
+        on_delete=models.CASCADE,
         verbose_name="菜谱"
     )
     ingredient = models.ForeignKey(
-        Ingredient, 
-        on_delete=models.CASCADE, # 如果食材被删除，相关的菜谱食材条目也应删除 (或者 models.PROTECT 阻止删除)
+        Ingredient,
+        on_delete=models.CASCADE,
         verbose_name="食材"
     )
     quantity = models.FloatField(verbose_name="用量")
@@ -144,35 +145,30 @@ class RecipeIngredient(models.Model):
     class Meta:
         verbose_name = "菜谱食材"
         verbose_name_plural = "菜谱食材"
-        # 确保在一个菜谱中，同一种食材只出现一次
         unique_together = ('recipe', 'ingredient')
-        ordering = ['recipe', 'id'] # 按菜谱排序，然后在菜谱内按添加顺序
-        
-        
+        ordering = ['recipe', 'id']
+
+
 class Review(models.Model):
     recipe = models.ForeignKey(
-        Recipe, 
-        on_delete=models.CASCADE, 
-        related_name='reviews', # 从 Recipe 对象访问其所有评价
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='reviews',
         verbose_name="菜谱"
     )
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='reviews_made', # 从 User 对象访问其发表的所有评价
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='reviews_made',
         verbose_name="用户"
     )
     rating = models.PositiveSmallIntegerField(
         verbose_name="评分",
-        # 可以使用 validators 来限制评分范围，例如 1 到 5
-        # from django.core.validators import MinValueValidator, MaxValueValidator
-        # validators=[MinValueValidator(1), MaxValueValidator(5)]
-        # 为了简化，暂时不加 validator，但实际项目中推荐加上
         help_text="评分 (例如1-5星)"
     )
     comment = models.TextField(blank=True, null=True, verbose_name="评论内容")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间") # 如果允许编辑
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
 
     def __str__(self):
         return f"Review for {self.recipe.title} by {self.user.username} ({self.rating} stars)"
@@ -180,6 +176,5 @@ class Review(models.Model):
     class Meta:
         verbose_name = "菜谱评价"
         verbose_name_plural = "菜谱评价"
-        # 一个用户对一个菜谱只能评价一次
         unique_together = ('recipe', 'user')
-        ordering = ['-created_at'] # 最新评价在最前面
+        ordering = ['-created_at']
