@@ -8,4 +8,6 @@ urlpatterns = [
     path('api/users/', include('users.api_urls')), 
     # 为我们的 recipes 应用的 API 设置路由 (稍后创建 recipes/api_urls.py)
     path('api/recipes/', include('recipes.api_urls')), 
+    # 测试路由 
+    path('recipes/',include('recipes.urls'))
 ]
