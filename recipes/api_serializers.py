@@ -1,11 +1,18 @@
 from rest_framework import serializers
 from .models import Ingredient, DietaryPreferenceTag, Recipe, RecipeIngredient, Review
 
-class IngredientSerializer(serializers.ModelSerializer):
+class IngredientSubstituteSerializer(serializers.ModelSerializer):
+    """用于显示食材替代品的简化序列化器"""
     class Meta:
         model = Ingredient
-        # 先包含基本字段，后续可按需调整 'common_substitutes' 的序列化方式
-        fields = ('id', 'name', 'category', 'description', 'image_url')
+        fields = ('id', 'name', 'category', 'description')
+
+class IngredientSerializer(serializers.ModelSerializer):
+    common_substitutes = IngredientSubstituteSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Ingredient
+        fields = ('id', 'name', 'category', 'description', 'image_url', 'common_substitutes')
 
 class DietaryPreferenceTagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -19,12 +26,17 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
     # 直接显示 ingredient 的名称，而不是嵌套整个 Ingredient 对象
     ingredient_name = serializers.CharField(source='ingredient.name', read_only=True)
     ingredient_id = serializers.IntegerField(source='ingredient.id', read_only=True)
-    ingredient_category = serializers.CharField(source='ingredient.category', read_only=True) # 可选
+    ingredient_category = serializers.CharField(source='ingredient.category', read_only=True)
+    substitutes = serializers.SerializerMethodField()
 
     class Meta:
         model = RecipeIngredient
-        fields = ('ingredient_id', 'ingredient_name', 'ingredient_category', 'quantity', 'unit', 'notes')
+        fields = ('ingredient_id', 'ingredient_name', 'ingredient_category', 'quantity', 'unit', 'notes', 'substitutes')
 
+    def get_substitutes(self, obj):
+        """获取食材的替代品列表"""
+        substitutes = obj.ingredient.common_substitutes.all()
+        return IngredientSubstituteSerializer(substitutes, many=True).data
 
 class RecipeListSerializer(serializers.ModelSerializer):
     """用于菜谱列表，显示摘要信息"""

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食材替代品功能测试</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .ingredient-card {
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        .ingredient-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .substitute-list {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .recipe-card {
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1 class="mb-4">食材替代品功能测试</h1>
+        
+        <!-- 食材列表部分 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2>食材列表</h2>
+                <div id="ingredientsList" class="row">
+                    <!-- 食材卡片将通过 JavaScript 动态加载 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 菜谱列表部分 -->
+        <div class="row">
+            <div class="col-12">
+                <h2>菜谱列表</h2>
+                <div id="recipesList" class="row">
+                    <!-- 菜谱卡片将通过 JavaScript 动态加载 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取食材列表
+        async function fetchIngredients() {
+            try {
+                const response = await fetch('/api/recipes/ingredients/');
+                const data = await response.json();
+                displayIngredients(data.results);
+            } catch (error) {
+                console.error('获取食材列表失败:', error);
+            }
+        }
+
+        // 显示食材列表
+        function displayIngredients(ingredients) {
+            const container = document.getElementById('ingredientsList');
+            container.innerHTML = ingredients.map(ingredient => `
+                <div class="col-md-4">
+                    <div class="card ingredient-card">
+                        <div class="card-body">
+                            <h5 class="card-title">${ingredient.name}</h5>
+                            <p class="card-text">分类: ${ingredient.category}</p>
+                            <p class="card-text">${ingredient.description || ''}</p>
+                            <div class="substitute-list">
+                                <h6>替代品:</h6>
+                                <ul>
+                                    ${ingredient.common_substitutes.map(sub => 
+                                        `<li>${sub.name} (${sub.category})</li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 获取菜谱列表
+        async function fetchRecipes() {
+            try {
+                const response = await fetch('/api/recipes/recipes/');
+                const data = await response.json();
+                displayRecipes(data);
+            } catch (error) {
+                console.error('获取菜谱列表失败:', error);
+            }
+        }
+
+        // 显示菜谱列表
+        function displayRecipes(recipes) {
+            const container = document.getElementById('recipesList');
+            container.innerHTML = recipes.map(recipe => `
+                <div class="col-md-6">
+                    <div class="card recipe-card">
+                        <div class="card-body">
+                            <h5 class="card-title">${recipe.title}</h5>
+                            <p class="card-text">${recipe.description || ''}</p>
+                            <p class="card-text">
+                                <small class="text-muted">
+                                    烹饪时间: ${recipe.cooking_time_minutes}分钟 | 
+                                    难度: ${recipe.difficulty}
+                                </small>
+                            </p>
+                            <button class="btn btn-primary" onclick="showRecipeDetail(${recipe.id})">
+                                查看详情
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 显示菜谱详情
+        async function showRecipeDetail(recipeId) {
+            try {
+                const response = await fetch(`/api/recipes/recipes/${recipeId}/`);
+                const recipe = await response.json();
+                
+                // 创建模态框显示详情
+                const modalHtml = `
+                    <div class="modal fade" id="recipeDetailModal" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">${recipe.title}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <h6>食材清单：</h6>
+                                    <ul>
+                                        ${recipe.recipe_ingredients.map(ing => `
+                                            <li>
+                                                ${ing.ingredient_name} - ${ing.quantity}${ing.unit}
+                                                ${ing.notes ? `(${ing.notes})` : ''}
+                                                ${ing.substitutes.length > 0 ? `
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        替代品: ${ing.substitutes.map(sub => sub.name).join(', ')}
+                                                    </small>
+                                                ` : ''}
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // 添加模态框到页面
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                
+                // 显示模态框
+                const modal = new bootstrap.Modal(document.getElementById('recipeDetailModal'));
+                modal.show();
+                
+                // 模态框关闭后移除
+                document.getElementById('recipeDetailModal').addEventListener('hidden.bs.modal', function () {
+                    this.remove();
+                });
+            } catch (error) {
+                console.error('获取菜谱详情失败:', error);
+            }
+        }
+
+        // 页面加载完成后执行
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchIngredients();
+            fetchRecipes();
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

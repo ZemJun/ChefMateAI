@@ -1,10 +1,13 @@
 from rest_framework import generics, permissions, viewsets
 from django_filters.rest_framework import DjangoFilterBackend # 用于强大的过滤
 from rest_framework.filters import SearchFilter, OrderingFilter # 用于搜索和排序
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from .models import Ingredient, DietaryPreferenceTag, Recipe
 from .api_serializers import (
     IngredientSerializer,
+    IngredientSubstituteSerializer,
     DietaryPreferenceTagSerializer,
     RecipeListSerializer,
     RecipeDetailSerializer
@@ -114,3 +117,25 @@ class RecipeViewSet(viewsets.ReadOnlyModelViewSet): # 使用 ReadOnlyModelViewSe
             #     # 或者要求菜谱 *所有* 标签都在用户偏好内 (更严格，更复杂)
 
         return queryset.distinct() #确保结果不重复
+
+class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    提供食材相关的API接口，包括获取替代品列表
+    """
+    queryset = Ingredient.objects.all()
+    serializer_class = IngredientSerializer
+    permission_classes = [permissions.AllowAny]
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['name', 'category', 'description']
+    ordering_fields = ['name', 'category']
+    ordering = ['name']
+
+    @action(detail=True, methods=['get'])
+    def substitutes(self, request, pk=None):
+        """
+        获取指定食材的替代品列表
+        """
+        ingredient = self.get_object()
+        substitutes = ingredient.common_substitutes.all()
+        serializer = IngredientSubstituteSerializer(substitutes, many=True)
+        return Response(serializer.data)
