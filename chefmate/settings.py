@@ -90,7 +90,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql', # 告诉 Django 我们用的是 PostgreSQL
         'NAME': 'chefmate_db',                      # 你在 pgAdmin 中创建的数据库名字
         'USER': 'chefmate_user',                    # 你在 pgAdmin 中创建的数据库用户名
-        'PASSWORD': 'admin',                        # 上面那个用户的密码
+        'PASSWORD': '123456',                        # 上面那个用户的密码
         'HOST': 'localhost',                        # 数据库服务器地址，本地一般是 localhost 或 127.0.0.1
         'PORT': '5432',                             # PostgreSQL 的默认端口号
     }
