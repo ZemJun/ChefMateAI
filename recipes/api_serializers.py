@@ -74,3 +74,108 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
             # 菜谱步骤 (RecipeStep) 模型如果创建了，也需要在这里添加
         )
         read_only_fields = fields # 详情页通常也是只读，创建/更新会有单独的序列化器和视图
+
+class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
+    """用于创建和更新菜谱的序列化器"""
+    recipe_ingredients = serializers.ListField(
+        child=serializers.DictField(),
+        write_only=True,
+        required=False,
+        help_text="食材列表，每个食材包含 id, quantity, unit, notes"
+    )
+    dietary_tags = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=DietaryPreferenceTag.objects.all(),
+        required=False
+    )
+
+    class Meta:
+        model = Recipe
+        fields = (
+            'id', 'title', 'description', 'cooking_time_minutes', 'difficulty',
+            'main_image_url', 'cuisine_type', 'status', 'recipe_ingredients',
+            'dietary_tags'
+        )
+        read_only_fields = ('id',)
+
+    def validate_recipe_ingredients(self, value):
+        """验证食材列表的格式"""
+        if not value:
+            raise serializers.ValidationError("至少需要一个食材")
+        
+        for ingredient_data in value:
+            if not all(k in ingredient_data for k in ['id', 'quantity', 'unit']):
+                raise serializers.ValidationError("每个食材必须包含 id, quantity 和 unit")
+            
+            try:
+                ingredient_id = int(ingredient_data['id'])
+                if not Ingredient.objects.filter(id=ingredient_id).exists():
+                    raise serializers.ValidationError(f"食材ID {ingredient_id} 不存在")
+            except (ValueError, TypeError):
+                raise serializers.ValidationError("食材ID必须是整数")
+            
+            try:
+                quantity = float(ingredient_data['quantity'])
+                if quantity <= 0:
+                    raise serializers.ValidationError("食材数量必须大于0")
+            except (ValueError, TypeError):
+                raise serializers.ValidationError("食材数量必须是数字")
+        
+        return value
+
+    def create(self, validated_data):
+        """创建菜谱及其关联的食材"""
+        recipe_ingredients = validated_data.pop('recipe_ingredients', [])
+        dietary_tags = validated_data.pop('dietary_tags', [])
+        
+        # 设置作者为当前用户
+        validated_data['author'] = self.context['request'].user
+        
+        # 创建菜谱
+        recipe = Recipe.objects.create(**validated_data)
+        
+        # 添加食材
+        for ingredient_data in recipe_ingredients:
+            RecipeIngredient.objects.create(
+                recipe=recipe,
+                ingredient_id=ingredient_data['id'],
+                quantity=ingredient_data['quantity'],
+                unit=ingredient_data['unit'],
+                notes=ingredient_data.get('notes', '')
+            )
+        
+        # 添加饮食标签
+        if dietary_tags:
+            recipe.dietary_tags.set(dietary_tags)
+        
+        return recipe
+
+    def update(self, instance, validated_data):
+        """更新菜谱及其关联的食材"""
+        recipe_ingredients = validated_data.pop('recipe_ingredients', None)
+        dietary_tags = validated_data.pop('dietary_tags', None)
+        
+        # 更新菜谱基本信息
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # 如果提供了新的食材列表，则更新
+        if recipe_ingredients is not None:
+            # 删除旧的食材关联
+            instance.recipeingredient_set.all().delete()
+            # 添加新的食材
+            for ingredient_data in recipe_ingredients:
+                RecipeIngredient.objects.create(
+                    recipe=instance,
+                    ingredient_id=ingredient_data['id'],
+                    quantity=ingredient_data['quantity'],
+                    unit=ingredient_data['unit'],
+                    notes=ingredient_data.get('notes', '')
+                )
+        
+        # 如果提供了新的饮食标签，则更新
+        if dietary_tags is not None:
+            instance.dietary_tags.set(dietary_tags)
+        
+        return instance

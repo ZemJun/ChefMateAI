@@ -3,6 +3,7 @@ from django_filters.rest_framework import DjangoFilterBackend # 用于强大的�
 from rest_framework.filters import SearchFilter, OrderingFilter # 用于搜索和排序
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import models
 
 from .models import Ingredient, DietaryPreferenceTag, Recipe
 from .api_serializers import (
@@ -10,9 +11,10 @@ from .api_serializers import (
     IngredientSubstituteSerializer,
     DietaryPreferenceTagSerializer,
     RecipeListSerializer,
-    RecipeDetailSerializer
+    RecipeDetailSerializer,
+    RecipeCreateUpdateSerializer
 )
-# from .permissions import IsOwnerOrReadOnly # 如果之后需要对象级别的权限
+from .permissions import IsOwnerOrReadOnly
 
 class IngredientListView(generics.ListAPIView):
     queryset = Ingredient.objects.all()
@@ -33,90 +35,106 @@ class DietaryPreferenceTagListView(generics.ListAPIView):
     ordering = ['name']
 
 # --- 菜谱视图 ---
-class RecipeViewSet(viewsets.ReadOnlyModelViewSet): # 使用 ReadOnlyModelViewSet 因为暂时只提供列表和详情
+class RecipeViewSet(viewsets.ModelViewSet):
     """
-    提供菜谱的列表和详情接口。
+    提供菜谱的完整CRUD操作。
     支持基于多种条件的筛选。
     """
-    queryset = Recipe.objects.filter(status='published').select_related('author').prefetch_related(
+    queryset = Recipe.objects.all().select_related('author').prefetch_related(
         'dietary_tags',
-        'recipeingredient_set__ingredient' # 优化查询，预取关联的食材信息
-    ) # 只显示已发布的菜谱，并优化查询
-    permission_classes = [permissions.AllowAny] # 浏览菜谱通常是公开的
+        'recipeingredient_set__ingredient'
+    )
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    # DjangoFilterBackend 的 filterset_fields 用于精确匹配
     filterset_fields = {
-        'cooking_time_minutes': ['lte', 'gte', 'exact'], # lte: 小于等于, gte: 大于等于
+        'cooking_time_minutes': ['lte', 'gte', 'exact'],
         'difficulty': ['exact'],
         'cuisine_type': ['exact', 'icontains'],
-        'author__username': ['exact'], # 按作者用户名筛选
-        'dietary_tags__name': ['exact', 'in'], # 按饮食标签名称筛选 (in 用于多个标签)
-        # 'ingredients__name': ['exact', 'in'], # 按包含的食材名称筛选 (这个会更复杂，下面单独处理)
+        'author__username': ['exact'],
+        'dietary_tags__name': ['exact', 'in'],
+        'status': ['exact'],
     }
-    search_fields = ['title', 'description', 'ingredients__name', 'dietary_tags__name'] # 模糊搜索
-    ordering_fields = ['cooking_time_minutes', 'difficulty', 'updated_at', 'title'] # 可排序字段
-    ordering = ['-updated_at'] # 默认按更新时间倒序
-
-    def get_serializer_class(self):
-        if self.action == 'list':
-            return RecipeListSerializer
-        if self.action == 'retrieve':
-            return RecipeDetailSerializer
-        return RecipeListSerializer # 默认或备用
+    search_fields = ['title', 'description', 'ingredients__name', 'dietary_tags__name']
+    ordering_fields = ['cooking_time_minutes', 'difficulty', 'updated_at', 'title']
+    ordering = ['-updated_at']
 
     def get_queryset(self):
         queryset = super().get_queryset()
         user = self.request.user
 
-        # 1. 根据用户拥有的食材进行筛选 (available_ingredients)
-        #    参数格式: available_ingredients=番茄,鸡蛋  (逗号分隔的食材名称)
-        #    或 available_ingredients=1,2 (逗号分隔的食材ID) -> 推荐用ID，更精确
-        available_ingredients_str = self.request.query_params.get('available_ingredients')
-        if available_ingredients_str:
-            available_ingredient_ids = []
-            try:
-                # 假设前端传递的是食材ID列表
-                available_ingredient_ids = [int(id_str.strip()) for id_str in available_ingredients_str.split(',')]
-            except ValueError:
-                # 如果传递的是名称，需要先查询ID，这里简化处理，推荐前端传ID
-                pass
+        # 如果用户未登录，只显示已发布的菜谱
+        if not user.is_authenticated:
+            return queryset.filter(status='published')
 
-            if available_ingredient_ids:
-                # 这是一个复杂的查询：找到那些 *主要* 食材是用户拥有的菜谱
-                # 这里简化为：至少包含一个用户拥有的食材的菜谱
-                # 更高级的匹配（例如：拥有食材占菜谱总食材的比例）会更复杂
-                queryset = queryset.filter(ingredients__id__in=available_ingredient_ids).distinct()
+        # 如果用户已登录，显示：
+        # 1. 所有已发布的菜谱
+        # 2. 用户自己的草稿和待审核的菜谱
+        return queryset.filter(
+            models.Q(status='published') |
+            models.Q(author=user, status__in=['draft', 'pending_review'])
+        ).distinct()
 
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return RecipeCreateUpdateSerializer
+        if self.action == 'list':
+            return RecipeListSerializer
+        if self.action == 'retrieve':
+            return RecipeDetailSerializer
+        return RecipeListSerializer
 
-        # 2. 根据用户不吃的食材进行排除 (exclude_ingredients)
-        #    参数格式: exclude_ingredients=香菜,洋葱 (逗号分隔的食材名称)
-        #    或 exclude_ingredients=3,4 (逗号分隔的食材ID)
-        exclude_ingredients_str = self.request.query_params.get('exclude_ingredients')
-        if exclude_ingredients_str:
-            exclude_ingredient_ids = []
-            try:
-                exclude_ingredient_ids = [int(id_str.strip()) for id_str in exclude_ingredients_str.split(',')]
-            except ValueError:
-                pass
-            if exclude_ingredient_ids:
-                queryset = queryset.exclude(ingredients__id__in=exclude_ingredient_ids)
+    def perform_create(self, serializer):
+        """创建菜谱时自动设置作者"""
+        serializer.save(author=self.request.user)
 
-        # 3. (可选) 如果用户已登录，自动应用其偏好 (disliked_ingredients, dietary_preferences)
-        #    这个逻辑也可以放在前端，由前端读取用户profile后主动构造查询参数
-        if user.is_authenticated:
-            # 自动排除用户不吃的食材
-            user_disliked_ids = list(user.disliked_ingredients.values_list('id', flat=True))
-            if user_disliked_ids:
-                queryset = queryset.exclude(ingredients__id__in=user_disliked_ids)
+    @action(detail=True, methods=['post'])
+    def submit_for_review(self, request, pk=None):
+        """将草稿提交审核"""
+        recipe = self.get_object()
+        if recipe.status != 'draft':
+            return Response(
+                {"detail": "只有草稿状态的菜谱可以提交审核"},
+                status=400
+            )
+        recipe.status = 'pending_review'
+        recipe.save()
+        return Response({"status": "success"})
 
-            # (可选) 自动筛选用户饮食偏好的菜谱
-            # user_preference_ids = list(user.dietary_preferences.values_list('id', flat=True))
-            # if user_preference_ids:
-            #     # 要求菜谱 *至少* 包含一个用户的饮食偏好标签
-            #     queryset = queryset.filter(dietary_tags__id__in=user_preference_ids).distinct()
-            #     # 或者要求菜谱 *所有* 标签都在用户偏好内 (更严格，更复杂)
+    @action(detail=True, methods=['post'])
+    def publish(self, request, pk=None):
+        """发布菜谱（仅管理员可用）"""
+        if not request.user.is_staff:
+            return Response(
+                {"detail": "只有管理员可以发布菜谱"},
+                status=403
+            )
+        recipe = self.get_object()
+        if recipe.status != 'pending_review':
+            return Response(
+                {"detail": "只有待审核状态的菜谱可以发布"},
+                status=400
+            )
+        recipe.status = 'published'
+        recipe.save()
+        return Response({"status": "success"})
 
-        return queryset.distinct() #确保结果不重复
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """拒绝菜谱（仅管理员可用）"""
+        if not request.user.is_staff:
+            return Response(
+                {"detail": "只有管理员可以拒绝菜谱"},
+                status=403
+            )
+        recipe = self.get_object()
+        if recipe.status != 'pending_review':
+            return Response(
+                {"detail": "只有待审核状态的菜谱可以被拒绝"},
+                status=400
+            )
+        recipe.status = 'rejected'
+        recipe.save()
+        return Response({"status": "success"})
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     """
