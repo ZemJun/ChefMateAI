@@ -6,20 +6,23 @@
     <title>ChefMate AI API 测试器</title>
     <style>
         /* 基础样式，让页面稍微好看一点点 */
-        body { font-family: sans-serif; margin: 20px; line-height: 1.6; }
-        section { margin-bottom: 30px; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
-        form div { margin-bottom: 10px; }
-        label { display: inline-block; width: 150px; margin-right: 10px; font-weight: bold;}
-        input[type="text"], input[type="email"], input[type="password"], input[type="url"], input[type="number"], textarea {
-            width: calc(100% - 170px); /* Adjust width considering label */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 20px; line-height: 1.6; background-color: #f8f9fa; color: #343a40;}
+        h1, h2, h3 { color: #0056b3; }
+        nav { margin-bottom: 20px; }
+        section { margin-bottom: 30px; padding: 20px; border: 1px solid #dee2e6; border-radius: 8px; background-color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        form div { margin-bottom: 12px; display: flex; align-items: center; flex-wrap: wrap; }
+        label { display: inline-block; width: 200px; margin-right: 10px; font-weight: bold; color: #495057;}
+        input[type="text"], input[type="email"], input[type="password"], input[type="url"], input[type="number"], textarea, select {
+            flex-grow: 1;
             padding: 8px;
-            border: 1px solid #ccc;
+            border: 1px solid #ced4da;
             border-radius: 4px;
         }
-         input[type="number"] { width: 80px; } /* Smaller width for number inputs */
+        input[type="number"] { max-width: 100px; }
+        input[type="checkbox"] { margin-left: 10px; transform: scale(1.2); }
 
-        textarea { height: 80px; }
-        button {
+        textarea { min-height: 80px; resize: vertical;}
+        button, .button-like {
             padding: 10px 15px;
             background-color: #007bff;
             color: white;
@@ -27,16 +30,23 @@
             border-radius: 4px;
             cursor: pointer;
             margin-right: 5px;
+            text-decoration: none;
+            display: inline-block;
         }
-        button:hover { background-color: #0056b3; }
-        pre { background-color: #f4f4f4; padding: 15px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; }
+        button:hover, .button-like:hover { background-color: #0056b3; }
+        button.delete-btn { background-color: #dc3545; }
+        button.delete-btn:hover { background-color: #c82333; }
+        button.edit-btn { background-color: #ffc107; color: #212529;}
+        button.edit-btn:hover { background-color: #e0a800; }
+        
+        pre { background-color: #e9ecef; padding: 15px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; word-wrap: break-word; border: 1px solid #dee2e6;}
         .hidden { display: none; }
         .result { margin-top: 15px; padding: 10px; border-top: 1px solid #eee; }
-        .error { color: red; }
-        .success { color: green; }
-         img { max-width: 150px; height: auto; vertical-align: middle; margin-right: 10px;}
-         .recipe-item { border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 15px; }
-         .recipe-item:last-child { border-bottom: none; margin-bottom: 0; }
+        .error { color: #dc3545; font-weight: bold;}
+        .success { color: #28a745; font-weight: bold;}
+        img { max-width: 150px; height: auto; vertical-align: middle; margin-right: 10px; border-radius: 4px; }
+        .list-item { border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between; align-items: center;}
+        .list-item:last-child { border-bottom: none; }
     </style>
 </head>
 <body>
@@ -46,13 +56,17 @@
         <button onclick="showSection('register-section')">用户注册</button>
         <button onclick="showSection('login-section')">用户登录</button>
         <button id="profile-nav-button" class="hidden" onclick="showSection('profile-section')">个人资料</button>
-        <button id="recipes-nav-button" class="hidden" onclick="showSection('recipes-section')">菜谱列表/详情</button>
-         <button id="logout-button" class="hidden">退出登录</button>
+        <button id="recipes-nav-button" class="hidden" onclick="showSection('recipes-section')">浏览菜谱</button>
+        <button id="create-recipe-nav-button" class="hidden" onclick="showSection('create-recipe-section')">创建/编辑菜谱</button>
+        <button id="inventory-nav-button" class="hidden" onclick="showSection('inventory-section')">我的库存</button>
+        <button id="shopping-list-nav-button" class="hidden" onclick="showSection('shopping-list-section')">购物清单</button>
+        <button id="logout-button" class="hidden">退出登录</button>
     </nav>
 
     <hr>
-     <p id="current-token-status">当前登录状态：未登录</p>
+    <p id="current-token-status">当前登录状态：未登录</p>
 
+    <!-- 用户注册 -->
     <section id="register-section" class="hidden">
         <h2>用户注册</h2>
         <form id="register-form">
@@ -67,6 +81,7 @@
         <div class="result" id="register-result"></div>
     </section>
 
+    <!-- 用户登录 -->
     <section id="login-section" class="hidden">
         <h2>用户登录</h2>
         <form id="login-form">
@@ -77,11 +92,11 @@
         <div class="result" id="login-result"></div>
     </section>
 
+    <!-- 个人资料 -->
     <section id="profile-section" class="hidden">
         <h2>个人资料</h2>
-        <button onclick="fetchProfile()">获取我的资料</button>
+        <button onclick="fetchProfile()">获取/刷新我的资料</button>
         <div id="profile-display" class="result"></div>
-
         <h3>更新资料</h3>
         <form id="profile-update-form">
              <div><label>用户名:</label><span id="profile-username-display"></span></div>
@@ -92,488 +107,471 @@
              <div><label for="profile-disliked">不吃的食材 (食材名, 逗号分隔):</label><input type="text" id="profile-disliked" placeholder="例如：香菜, 洋葱"></div>
              <div><label for="profile-firstname">名:</label><input type="text" id="profile-firstname"></div>
              <div><label for="profile-lastname">姓:</label><input type="text" id="profile-lastname"></div>
-
             <button type="submit">更新资料</button>
         </form>
          <div class="result" id="profile-update-result"></div>
     </section>
 
+    <!-- 浏览菜谱 -->
     <section id="recipes-section" class="hidden">
-        <h2>菜谱</h2>
-
+        <h2>浏览菜谱</h2>
         <div>
             <h3>筛选菜谱</h3>
             <form id="recipe-filter-form">
-                 <div>
-                    <label for="filter-ingredients">手头食材 (ID, 逗号分隔):</label>
-                    <input type="text" id="filter-ingredients" placeholder="例如：1,5">
-                </div>
-                 <div>
-                    <label for="filter-exclude">不吃食材 (ID, 逗号分隔):</label>
-                    <input type="text" id="filter-exclude" placeholder="例如：3,7">
-                </div>
-                 <div>
-                    <label for="filter-time">最长烹饪时间 (分钟):</label>
-                    <input type="number" id="filter-time" placeholder="例如：30">
-                </div>
-                 <div>
-                    <label for="filter-difficulty">难度 (1, 2, 3):</label>
-                    <input type="number" id="filter-difficulty" min="1" max="3" placeholder="例如：1">
-                </div>
-                 <div>
-                    <label for="filter-search">关键词搜索 (标题/描述/食材名):</label>
-                    <input type="text" id="filter-search" placeholder="例如：鸡蛋">
-                </div>
-                 <div>
-                     <label for="filter-dietary">饮食标签 (名称, 逗号分隔):</label>
-                     <input type="text" id="filter-dietary" placeholder="例如：素食, 低脂">
-                 </div>
-                 <div>
-                     <label for="filter-cuisine">菜系:</label>
-                     <input type="text" id="filter-cuisine" placeholder="例如：川菜">
-                 </div>
+                 <div><label for="filter-ingredients">手头食材 (ID, 逗号分隔):</label><input type="text" id="filter-ingredients" placeholder="例如：1,5"></div>
+                 <div><label for="filter-exclude">不吃食材 (ID, 逗号分隔):</label><input type="text" id="filter-exclude" placeholder="例如：3,7"></div>
+                 <div><label for="filter-time">最长烹饪时间 (分钟):</label><input type="number" id="filter-time" placeholder="例如：30"></div>
+                 <div><label for="filter-difficulty">难度 (1, 2, 3):</label><input type="number" id="filter-difficulty" min="1" max="3" placeholder="例如：1"></div>
+                 <div><label for="filter-search">关键词搜索 (标题/描述/食材名):</label><input type="text" id="filter-search" placeholder="例如：鸡蛋"></div>
+                 <div><label for="filter-dietary">饮食标签 (名称, 逗号分隔):</label><input type="text" id="filter-dietary" placeholder="例如：素食, 低脂"></div>
+                 <div><label for="filter-cuisine">菜系:</label><input type="text" id="filter-cuisine" placeholder="例如：川菜"></div>
                 <button type="submit">筛选/搜索菜谱</button>
-                 <button type="button" onclick="fetchRecipes()">显示所有已发布菜谱</button>
+                <button type="button" onclick="document.getElementById('recipe-filter-form').reset(); fetchRecipes();">显示所有/重置</button>
             </form>
         </div>
-
         <div id="recipes-list" class="result"></div>
-
         <h3>菜谱详情</h3>
         <div>
             <label for="recipe-detail-id">输入菜谱 ID:</label>
-            <input type="number" id="recipe-detail-id" placeholder="例如：42">
+            <input type="number" id="recipe-detail-id" placeholder="例如：1">
             <button onclick="fetchRecipeDetailFromInput()">获取详情</button>
         </div>
         <div id="recipe-detail-display" class="result"></div>
     </section>
 
+    <!-- 创建/编辑菜谱 -->
+    <section id="create-recipe-section" class="hidden">
+        <h2>创建或编辑菜谱</h2>
+        <div>
+            <label for="edit-recipe-id">要编辑的菜谱ID (留空则为创建):</label>
+            <input type="number" id="edit-recipe-id" placeholder="输入ID后点击加载">
+            <button onclick="loadRecipeForEdit()">加载菜谱进行编辑</button>
+        </div>
+        <form id="create-recipe-form">
+            <div><label for="recipe-title">标题:</label><input type="text" id="recipe-title" required></div>
+            <div><label for="recipe-description">简介:</label><textarea id="recipe-description"></textarea></div>
+            <div><label for="recipe-time">烹饪时长(分钟):</label><input type="number" id="recipe-time"></div>
+            <div><label for="recipe-difficulty">难度:</label>
+                <select id="recipe-difficulty">
+                    <option value="1">1 - 简单</option>
+                    <option value="2">2 - 中等</option>
+                    <option value="3">3 - 困难</option>
+                </select>
+            </div>
+            <div><label for="recipe-image">主图链接:</label><input type="url" id="recipe-image"></div>
+            <div><label for="recipe-cuisine">菜系:</label><input type="text" id="recipe-cuisine" placeholder="例如: 川菜"></div>
+            <div><label for="recipe-status">状态:</label>
+                <select id="recipe-status">
+                    <option value="draft">草稿</option>
+                    <option value="published">已发布</option>
+                </select>
+            </div>
+            <div><label for="recipe-dietary-tags">饮食标签 (ID, 逗号分隔):</label><input type="text" id="recipe-dietary-tags" placeholder="例如: 1, 3"></div>
+            <div><label for="recipe-ingredients-data">食材列表:</label>
+                <textarea id="recipe-ingredients-data" placeholder="每行一个食材, 格式: ingredient_id,quantity,unit,notes
+例如:
+1,100,克,切碎
+5,2,个,打散"></textarea>
+            </div>
+            <button type="submit">提交菜谱</button>
+        </form>
+        <div class="result" id="create-recipe-result"></div>
+    </section>
+
+    <!-- 我的库存 -->
+    <section id="inventory-section" class="hidden">
+        <h2>我的库存</h2>
+        <button onclick="fetchInventory()">获取/刷新我的库存</button>
+        <h3>添加库存物品</h3>
+        <form id="add-inventory-form">
+            <div><label for="inv-ingredient-id">食材ID:</label><input type="number" id="inv-ingredient-id" required></div>
+            <div><label for="inv-notes">备注 (可选):</label><input type="text" id="inv-notes"></div>
+            <button type="submit">添加到库存</button>
+        </form>
+        <div class="result" id="add-inventory-result"></div>
+        <h3>当前库存列表</h3>
+        <div id="inventory-list" class="result"></div>
+    </section>
+
+    <!-- 购物清单 -->
+    <section id="shopping-list-section" class="hidden">
+        <h2>我的购物清单</h2>
+        <button onclick="fetchShoppingList()">获取/刷新购物清单</button>
+        <h3>添加购物项</h3>
+        <form id="add-shopping-item-form">
+            <div><label for="shop-ingredient-id">食材ID:</label><input type="number" id="shop-ingredient-id" required></div>
+            <div><label for="shop-quantity">数量 (可选):</label><input type="number" step="0.1" id="shop-quantity"></div>
+            <div><label for="shop-unit">单位 (可选):</label><input type="text" id="shop-unit" placeholder="例如: 克, 个"></div>
+            <button type="submit">添加到购物清单</button>
+        </form>
+        <div class="result" id="add-shopping-item-result"></div>
+        <h3>当前购物清单</h3>
+        <div id="shopping-list" class="result"></div>
+    </section>
 
     <script>
-        const API_BASE_URL = 'http://127.0.0.1:8000/api'; // 根据你的 Django 服务器地址修改
+        const API_BASE_URL = 'http://127.0.0.1:8000/api';
+        let editingRecipeId = null;
 
         // --- 帮助函数 ---
-        // 获取存储在 localStorage 中的 Access Token
-        function getAccessToken() {
-            return localStorage.getItem('access_token');
-        }
-
-        // 将 Access 和 Refresh Token 存储到 localStorage 并更新 UI 状态
+        function getAccessToken() { return localStorage.getItem('access_token'); }
         function setTokens(access, refresh) {
+            const navButtons = ['profile-nav-button', 'recipes-nav-button', 'create-recipe-nav-button', 'inventory-nav-button', 'shopping-list-nav-button', 'logout-button'];
             if (access) {
                 localStorage.setItem('access_token', access);
                 localStorage.setItem('refresh_token', refresh);
-                document.getElementById('current-token-status').textContent = `当前登录状态：已登录 (Access Token: ${access.substring(0, 30)}...)`;
-                document.getElementById('profile-nav-button').classList.remove('hidden');
-                document.getElementById('recipes-nav-button').classList.remove('hidden');
-                 document.getElementById('logout-button').classList.remove('hidden');
+                document.getElementById('current-token-status').textContent = `当前登录状态：已登录`;
+                navButtons.forEach(id => document.getElementById(id).classList.remove('hidden'));
+                showSection('profile-section');
             } else {
                 localStorage.removeItem('access_token');
                 localStorage.removeItem('refresh_token');
-                 document.getElementById('current-token-status').textContent = '当前登录状态：未登录';
-                document.getElementById('profile-nav-button').classList.add('hidden');
-                document.getElementById('recipes-nav-button').classList.add('hidden');
-                 document.getElementById('logout-button').classList.add('hidden');
-            }
-             // 登录/退出后，自动切换显示的区域
-            if (access) {
-                 showSection('profile-section'); // 登录后默认显示个人资料
-            } else {
-                 showSection('login-section'); // 退出后默认显示登录
+                document.getElementById('current-token-status').textContent = '当前登录状态：未登录';
+                navButtons.forEach(id => document.getElementById(id).classList.add('hidden'));
+                showSection('login-section');
             }
         }
-
-        // 构建包含认证信息的请求头
         function getAuthHeaders() {
             const token = getAccessToken();
-            const headers = {
-                'Content-Type': 'application/json'
-            };
-            if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
-            }
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) { headers['Authorization'] = `Bearer ${token}`; }
             return headers;
         }
-
-        // 显示指定 Section，隐藏其他 Section
         function showSection(sectionId) {
-             document.querySelectorAll('section').forEach(section => {
-                 section.classList.add('hidden');
-             });
+             document.querySelectorAll('section').forEach(section => section.classList.add('hidden'));
              const sectionToShow = document.getElementById(sectionId);
-             if (sectionToShow) {
-                 sectionToShow.classList.remove('hidden');
-             }
+             if (sectionToShow) { sectionToShow.classList.remove('hidden'); }
+        }
+        function clearResult(elementId) { document.getElementById(elementId).innerHTML = ''; }
+        function displayResult(elementId, response, data, successMessage = '操作成功！') {
+            const resultDiv = document.getElementById(elementId);
+            const resultClass = response.ok ? 'success' : 'error';
+            let message = response.ok ? successMessage : '操作失败!';
+            resultDiv.innerHTML = `<p class="${resultClass}">[${response.status}] ${message}</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
         }
 
-        // 清空指定元素内的结果显示
-        function clearResult(elementId) {
-            document.getElementById(elementId).innerHTML = '';
+        // --- API 调用封装 ---
+        async function apiCall(url, method = 'GET', body = null) {
+            const options = {
+                method,
+                headers: getAuthHeaders(),
+            };
+            if (body) {
+                options.body = JSON.stringify(body);
+            }
+            const response = await fetch(url, options);
+            const data = await response.json().catch(() => ({})); // Handle empty responses
+            return { response, data };
         }
 
-
-        // --- 用户注册 ---
-        document.getElementById('register-form').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const form = event.target;
-            const resultDiv = document.getElementById('register-result');
-            clearResult('register-result'); // 清空上次结果
-
+        // --- 用户认证 ---
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
             const data = {
-                username: form['reg-username'].value.trim(),
-                email: form['reg-email'].value.trim(),
-                password: form['reg-password'].value,
-                password2: form['reg-password2'].value,
-                nickname: form['reg-nickname'].value.trim(),
-                avatar_url: form['reg-avatar'].value.trim(),
+                username: form['reg-username'].value, email: form['reg-email'].value,
+                password: form['reg-password'].value, password2: form['reg-password2'].value,
+                nickname: form['reg-nickname'].value, avatar_url: form['reg-avatar'].value,
             };
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/users/register/`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const result = await response.json();
-                 const resultClass = response.ok ? 'success' : 'error';
-                 resultDiv.innerHTML = `<p class="${resultClass}">状态码: ${response.status}</p><pre>${JSON.stringify(result, null, 2)}</pre>`;
-
-                if (response.ok) {
-                     alert('注册成功！请登录。');
-                     form.reset(); // 清空表单
-                     showSection('login-section'); // 注册成功后跳转到登录页面
-                }
-            } catch (error) {
-                 resultDiv.innerHTML = `<p class="error">发生错误: ${error}</p>`;
-            }
+            const { response, data: result } = await apiCall(`${API_BASE_URL}/users/register/`, 'POST', data);
+            displayResult('register-result', response, result, '注册成功！请登录。');
+            if (response.ok) { form.reset(); showSection('login-section'); }
         });
-
-        // --- 用户登录 ---
-        document.getElementById('login-form').addEventListener('submit', async (event) => {
-            event.preventDefault();
-            const form = event.target;
-            const resultDiv = document.getElementById('login-result');
-            clearResult('login-result'); // 清空上次结果
-
-            const data = {
-                username: form['login-username'].value.trim(),
-                password: form['login-password'].value,
-            };
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/users/login/`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const result = await response.json();
-                const resultClass = response.ok ? 'success' : 'error';
-                resultDiv.innerHTML = `<p class="${resultClass}">状态码: ${response.status}</p><pre>${JSON.stringify(result, null, 2)}</pre>`;
-
-                if (response.ok) {
-                    setTokens(result.access, result.refresh); // 存储 token
-                    alert('登录成功！');
-                    form.reset(); // 清空表单
-                    // 登录成功后，可以自动获取个人资料或菜谱列表
-                    // fetchProfile(); // 自动获取个人资料
-                    // fetchRecipes(); // 自动获取菜谱列表
-                } else {
-                    setTokens(null, null); // 登录失败，清除旧 token
-                }
-            } catch (error) {
-                 resultDiv.innerHTML = `<p class="error">发生错误: ${error}</p>`;
-                 setTokens(null, null); // 发生错误，清除 token
-            }
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const data = { username: form['login-username'].value, password: form['login-password'].value };
+            const { response, data: result } = await apiCall(`${API_BASE_URL}/users/login/`, 'POST', data);
+            displayResult('login-result', response, result);
+            if (response.ok) { setTokens(result.access, result.refresh); form.reset(); fetchProfile(); } 
+            else { setTokens(null, null); }
         });
-
-         // --- 用户退出登录 ---
         document.getElementById('logout-button').addEventListener('click', () => {
-             // 理论上，退出登录应该向后端发送请求使 Refresh Token 失效
-             // Simple JWT 提供了一个 Blacklist API (/api/token/blacklist/)
-             // 这里为了简单，我们只清除本地存储的 token
-            setTokens(null, null); // 清除本地 token
+            setTokens(null, null);
             alert('已退出登录 (本地 token 已清除)');
         });
 
-
         // --- 个人资料 ---
         async function fetchProfile() {
-            const profileDisplayDiv = document.getElementById('profile-display');
-            const profileUpdateForm = document.getElementById('profile-update-form');
-            clearResult('profile-display');
-             clearResult('profile-update-result');
-
-
-            const accessToken = getAccessToken();
-            if (!accessToken) {
-                 profileDisplayDiv.innerHTML = '<p class="error">请先登录以查看个人资料。</p>';
-                 return;
-            }
-
-            profileDisplayDiv.innerHTML = '正在获取个人资料...';
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/users/profile/`, {
-                    method: 'GET',
-                    headers: getAuthHeaders() // 需要 token
-                });
-                const profileData = await response.json();
-                const resultClass = response.ok ? 'success' : 'error';
-                profileDisplayDiv.innerHTML = `<p class="${resultClass}">状态码: ${response.status}</p><h3>当前资料:</h3><pre>${JSON.stringify(profileData, null, 2)}</pre>`;
-
-                if (response.ok) {
-                    // 用获取到的数据显示在更新表单中
-                     document.getElementById('profile-username-display').textContent = profileData.username || '';
-                    document.getElementById('profile-email').value = profileData.email || '';
-                    document.getElementById('profile-nickname').value = profileData.nickname || '';
-                    document.getElementById('profile-avatar').value = profileData.avatar_url || '';
-                     // 将 M2M 字段的数组转换为逗号分隔的字符串
-                    document.getElementById('profile-dietary').value = profileData.dietary_preferences ? profileData.dietary_preferences.join(', ') : '';
-                    document.getElementById('profile-disliked').value = profileData.disliked_ingredients ? profileData.disliked_ingredients.join(', ') : '';
-                    document.getElementById('profile-firstname').value = profileData.first_name || '';
-                     document.getElementById('profile-lastname').value = profileData.last_name || '';
-
-                }
-            } catch (error) {
-                profileDisplayDiv.innerHTML = `<p class="error">获取个人资料时发生错误: ${error}</p>`;
+            const { response, data } = await apiCall(`${API_BASE_URL}/users/profile/`);
+            displayResult('profile-display', response, data, '个人资料获取成功！');
+            if (response.ok) {
+                document.getElementById('profile-username-display').textContent = data.username || '';
+                document.getElementById('profile-email').value = data.email || '';
+                document.getElementById('profile-nickname').value = data.nickname || '';
+                document.getElementById('profile-avatar').value = data.avatar_url || '';
+                document.getElementById('profile-dietary').value = data.dietary_preferences ? data.dietary_preferences.join(', ') : '';
+                document.getElementById('profile-disliked').value = data.disliked_ingredients ? data.disliked_ingredients.join(', ') : '';
+                document.getElementById('profile-firstname').value = data.first_name || '';
+                document.getElementById('profile-lastname').value = data.last_name || '';
             }
         }
-
-         document.getElementById('profile-update-form').addEventListener('submit', async (event) => {
-             event.preventDefault();
-             const form = event.target;
-             const resultDiv = document.getElementById('profile-update-result');
-             clearResult('profile-update-result');
-
-             const accessToken = getAccessToken();
-            if (!accessToken) {
-                 resultDiv.innerHTML = '<p class="error">请先登录以更新个人资料。</p>';
-                 return;
-            }
-
-             // 将逗号分隔的字符串转回数组 (去除空字符串和首尾空格)
-             const dietaryNames = form['profile-dietary'].value.split(',').map(name => name.trim()).filter(name => name);
-             const dislikedNames = form['profile-disliked'].value.split(',').map(name => name.trim()).filter(name => name);
-
-             const data = {
-                 email: form['profile-email'].value.trim(),
-                 nickname: form['profile-nickname'].value.trim(),
-                 avatar_url: form['profile-avatar'].value.trim(),
-                 dietary_preferences: dietaryNames, // 使用 SlugRelatedField by name 发送名称数组
-                 disliked_ingredients: dislikedNames, // 使用 SlugRelatedField by name 发送名称数组
-                 first_name: form['profile-firstname'].value.trim(),
-                 last_name: form['profile-lastname'].value.trim(),
-             };
-
-             // 删除空字符串字段，避免PATCH请求清空数据库中的值 (如果字段是blank=True/null=True)
-             Object.keys(data).forEach(key => {
-                if (data[key] === '') {
-                    delete data[key];
-                }
-                 // 对于数组字段，如果为空数组，也删除，除非你明确要清空 M2M 关系
-                 if (Array.isArray(data[key]) && data[key].length === 0) {
-                     // 如果输入框为空，意味着用户可能想清空偏好/不吃的食材列表
-                     // SlugRelatedField 处理空数组表示清除 M2M 关系，所以这里保留空数组
-                 }
-             });
-              // 如果某些字段不需要更新，也不必发送
-              // 这里的实现是发送表单所有字段的值（非空或空数组），对应 PATCH 是合理的
-
-             try {
-                 const response = await fetch(`${API_BASE_URL}/users/profile/`, {
-                     method: 'PATCH', // 使用 PATCH 进行部分更新
-                     headers: getAuthHeaders(), // 需要 token
-                     body: JSON.stringify(data)
-                 });
-                 const result = await response.json();
-                 const resultClass = response.ok ? 'success' : 'error';
-                 resultDiv.innerHTML = `<p class="${resultClass}">状态码: ${response.status}</p><pre>${JSON.stringify(result, null, 2)}</pre>`;
-
-                 if (response.ok) {
-                     alert('资料更新成功！');
-                     fetchProfile(); // 刷新显示的资料
-                 }
-             } catch (error) {
-                 resultDiv.innerHTML = `<p class="error">更新资料时发生错误: ${error}</p>`;
-             }
-         });
-
-
-        // --- 菜谱列表 ---
-        async function fetchRecipes(filterParams = {}) {
-             const recipesListDiv = document.getElementById('recipes-list');
-             clearResult('recipes-list');
-             recipesListDiv.innerHTML = '正在加载菜谱...'; // 加载提示
-
-             // 构建查询参数字符串
-             const queryParams = new URLSearchParams();
-             for (const key in filterParams) {
-                 // 确保只添加非空值作为参数
-                 if (filterParams[key] !== null && filterParams[key] !== undefined && filterParams[key] !== '') {
-                      // 对于逗号分隔的参数，Django Filter Backend通常需要原样传递逗号字符串
-                      // 如果需要特殊处理（例如每个值作为一个单独参数），需要调整这里的逻辑
-                      queryParams.append(key, filterParams[key]);
-                 }
-             }
-             const url = `${API_BASE_URL}/recipes/recipes/?${queryParams.toString()}`;
-
-             try {
-                 const response = await fetch(url, {
-                     method: 'GET',
-                     headers: getAuthHeaders() // 发送 token，以便后端自动排除用户不吃的食材等
-                 });
-                 const result = await response.json();
-
-                 const resultClass = response.ok ? 'success' : 'error';
-                 // recipesListDiv.innerHTML = `<p class="${resultClass}">状态码: ${response.status}</p>`; // 可以在控制台看状态码
-
-                 if (response.ok && result.results) { // 假设列表接口返回 { count: ..., next: ..., previous: ..., results: [...] }
-                     if (result.results.length > 0) {
-                         let html = '<h3>菜谱列表:</h3>';
-                         result.results.forEach(recipe => {
-                             html += `
-                                 <div class="recipe-item">
-                                     <h4>${recipe.title} (ID: ${recipe.id})</h4>
-                                      <img src="${recipe.main_image_url || 'https://via.placeholder.com/100x80?text=No+Image'}" alt="${recipe.title}">
-                                     <p>${recipe.description ? recipe.description.substring(0, 150) + '...' : '无简介'}</p>
-                                     <p>时长: ${recipe.cooking_time_minutes || '?'}分钟 | 难度: ${recipe.difficulty || '?'}</p>
-                                     <p>标签: ${recipe.dietary_tags.map(tag => tag.name).join(', ') || '无标签'}</p>
-                                     <button onclick="fetchRecipeDetail(${recipe.id})">查看详情</button>
-                                 </div>
-                             `;
-                         });
-                          // 添加分页信息 (如果后端支持分页)
-                         if (result.next || result.previous) {
-                            html += `<p>分页: ${result.previous ? '上一页' : ''} ${result.next ? '下一页' : ''}</p>`;
-                         }
-                         recipesListDiv.innerHTML = html;
-                     } else {
-                         recipesListDiv.innerHTML = '没有找到符合条件的菜谱。';
-                     }
-                 } else {
-                      recipesListDiv.innerHTML = '获取菜谱列表失败:<pre>' + JSON.stringify(result, null, 2) + '</pre>';
-                 }
-             } catch (error) {
-                 recipesListDiv.innerHTML = `<p class="error">获取菜谱列表时发生错误: ${error}</p>`;
-             }
-        }
-
-        // 处理菜谱筛选表单提交
-        document.getElementById('recipe-filter-form').addEventListener('submit', (event) => {
-            event.preventDefault();
-            const form = event.target;
-             const filterParams = {
-                 available_ingredients: form['filter-ingredients'].value.trim(),
-                 exclude_ingredients: form['filter-exclude'].value.trim(),
-                 cooking_time_minutes__lte: form['filter-time'].value.trim(),
-                 difficulty: form['filter-difficulty'].value.trim(),
-                 search: form['filter-search'].value.trim(),
-                 dietary_tags__name__in: form['filter-dietary'].value.trim(), // 逗号分隔的名称列表
-                 cuisine_type: form['filter-cuisine'].value.trim(),
-                 // 其他筛选参数可以继续添加
-             };
-            fetchRecipes(filterParams); // 根据筛选参数获取菜谱
+        document.getElementById('profile-update-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                email: form['profile-email'].value,
+                nickname: form['profile-nickname'].value,
+                avatar_url: form['profile-avatar'].value,
+                dietary_preferences: form['profile-dietary'].value.split(',').map(s => s.trim()).filter(Boolean),
+                disliked_ingredients: form['profile-disliked'].value.split(',').map(s => s.trim()).filter(Boolean),
+                first_name: form['profile-firstname'].value,
+                last_name: form['profile-lastname'].value,
+            };
+            const { response, data: result } = await apiCall(`${API_BASE_URL}/users/profile/`, 'PATCH', data);
+            displayResult('profile-update-result', response, result, '资料更新成功！');
+            if (response.ok) fetchProfile();
         });
 
-        // --- 菜谱详情 ---
+        // --- 菜谱浏览和详情 ---
+        async function fetchRecipes(filterParams = {}) {
+            const recipesListDiv = document.getElementById('recipes-list');
+            recipesListDiv.innerHTML = '正在加载菜谱...';
+            const queryParams = new URLSearchParams(Object.fromEntries(Object.entries(filterParams).filter(([_, v]) => v != null && v !== '')));
+            const { response, data } = await apiCall(`${API_BASE_URL}/recipes/recipes/?${queryParams.toString()}`);
+            if (response.ok && data.results) {
+                if (data.results.length > 0) {
+                    recipesListDiv.innerHTML = '<h3>菜谱列表:</h3>' + data.results.map(recipe => `
+                        <div class="list-item">
+                            <div>
+                                <img src="${recipe.main_image_url || 'https://via.placeholder.com/100x80?text=No+Image'}" alt="${recipe.title}">
+                                <span><b>${recipe.title} (ID: ${recipe.id})</b> by ${recipe.author_username || 'N/A'}</span>
+                            </div>
+                            <button onclick="fetchRecipeDetail(${recipe.id})">查看详情</button>
+                        </div>
+                    `).join('');
+                } else {
+                    recipesListDiv.innerHTML = '没有找到符合条件的菜谱。';
+                }
+            } else {
+                recipesListDiv.innerHTML = '获取菜谱列表失败:<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            }
+        }
+        document.getElementById('recipe-filter-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const filterParams = {
+                available_ingredients: form['filter-ingredients'].value,
+                exclude_ingredients: form['filter-exclude'].value,
+                cooking_time_minutes__lte: form['filter-time'].value,
+                difficulty: form['filter-difficulty'].value,
+                search: form['filter-search'].value,
+                dietary_tags__name__in: form['filter-dietary'].value,
+                cuisine_type: form['filter-cuisine'].value,
+            };
+            fetchRecipes(filterParams);
+        });
         async function fetchRecipeDetail(recipeId) {
-             const detailDiv = document.getElementById('recipe-detail-display');
-             clearResult('recipe-detail-display');
+            const detailDiv = document.getElementById('recipe-detail-display');
+            if (!recipeId) return;
+            detailDiv.innerHTML = `正在加载菜谱 ${recipeId} 的详情...`;
+            const { response, data } = await apiCall(`${API_BASE_URL}/recipes/recipes/${recipeId}/`);
+            if (response.ok) {
+                let ingredientsHtml = data.recipe_ingredients && data.recipe_ingredients.length > 0
+                    ? data.recipe_ingredients.map(item => `<li>${item.ingredient_name}: ${item.quantity || ''} ${item.unit || ''} ${item.notes ? `(${item.notes})` : ''}</li>`).join('')
+                    : '<li>无食材信息。</li>';
 
-             if (!recipeId) {
-                 detailDiv.innerHTML = '<p class="error">请输入有效的菜谱 ID。</p>';
-                 return;
-             }
-
-             detailDiv.innerHTML = `正在加载菜谱 ${recipeId} 的详情...`; // 加载提示
-
-             try {
-                 const response = await fetch(`${API_BASE_URL}/recipes/recipes/${recipeId}/`, {
-                     method: 'GET',
-                     headers: getAuthHeaders() // 发送 token，以便后端可以根据用户上下文调整响应 (如果未来有需求)
-                 });
-                 const recipeData = await response.json();
-                  const resultClass = response.ok ? 'success' : 'error';
-                 // detailDiv.innerHTML = `<p class="${resultClass}">状态码: ${response.status}</p>`; // 可以在控制台看状态码
-
-                 if (response.ok) {
-                    let html = `<h3>${recipeData.title} (ID: ${recipeData.id})</h3>`;
-                    html += `<p>作者: ${recipeData.author_username || 'N/A'}</p>`;
-                    html += `<img src="${recipeData.main_image_url || 'https://via.placeholder.com/200x150?text=No+Image'}" alt="${recipeData.title}">`;
-                    html += `<p>简介: ${recipeData.description || '无简介'}</p>`;
-                    html += `<p>时长: ${recipeData.cooking_time_minutes || '?'}分钟 | 难度: ${recipeData.difficulty || '?'}</p>`;
-                    html += `<p>菜系: ${recipeData.cuisine_type || 'N/A'}</p>`;
-                    html += `<p>饮食标签: ${recipeData.dietary_tags.map(tag => tag.name).join(', ') || '无标签'}</p>`;
-
-                    html += '<h4>所需食材:</h4><ul>';
-                    if (recipeData.recipe_ingredients && recipeData.recipe_ingredients.length > 0) {
-                        recipeData.recipe_ingredients.forEach(item => {
-                             // TODO: 在这里可以检查用户库存，并标记是否拥有该食材
-                             // TODO: 如果用户没有，并且 Ingredient 模型有 substitutes，可以在这里显示替代品建议
-                            html += `<li>${item.ingredient_name}: ${item.quantity || '?'} ${item.unit || ''} (${item.notes || ''})</li>`;
-                        });
-                    } else {
-                        html += '<li>无食材信息。</li>';
-                    }
-                    html += '</ul>';
-
-                    // 如果你创建了 RecipeStep 模型和对应的序列化器，可以在这里添加步骤
-                    // html += '<h4>烹饪步骤:</h4><ol>';
-                    // if (recipeData.steps && recipeData.steps.length > 0) {
-                    //     recipeData.steps.forEach(step => {
-                    //         html += `<li>${step.description}</li>`;
-                    //     });
-                    // } else {
-                    //     html += '<li>无步骤信息。</li>';
-                    // }
-                    // html += '</ol>';
-
-                     // 如果你实现了 Review 模型和对应的序列化器，可以在这里添加评论
-                    // html += '<h4>评论:</h4><ul>';
-                    // if (recipeData.reviews && recipeData.reviews.length > 0) {
-                    //      recipeData.reviews.forEach(review => {
-                    //          html += `<li>${review.user.username}: ${review.rating} 星 - ${review.comment || '无评论'}</li>`;
-                    //      });
-                    // } else {
-                    //      html += '<li>暂无评论。</li>';
-                    // }
-                    // html += '</ul>';
-
-
-                    detailDiv.innerHTML = html;
-                 } else {
-                     detailDiv.innerHTML = '获取菜谱详情失败:<pre>' + JSON.stringify(recipeData, null, 2) + '</pre>';
-                 }
-             } catch (error) {
-                 detailDiv.innerHTML = `<p class="error">获取菜谱详情时发生错误: ${error}</p>`;
-             }
+                detailDiv.innerHTML = `
+                    <h3>${data.title} (ID: ${data.id})</h3>
+                    <p>作者: ${data.author_username || 'N/A'}</p>
+                    <h4>所需食材:</h4><ul>${ingredientsHtml}</ul>
+                    <hr>
+                    <h4>评价</h4>
+                    <div id="recipe-reviews-display">正在加载评价...</div>
+                    <form id="add-review-form" data-recipe-id="${recipeId}">
+                        <h5>发表新评价</h5>
+                        <div><label for="review-rating">评分 (1-5):</label><input type="number" id="review-rating" min="1" max="5" required></div>
+                        <div><label for="review-comment">评论:</label><textarea id="review-comment"></textarea></div>
+                        <button type="submit">提交评价</button>
+                    </form>
+                    <div class="result" id="add-review-result"></div>`;
+                
+                document.getElementById('add-review-form').addEventListener('submit', addReview);
+                fetchReviews(recipeId); // 加载评价
+            } else {
+                detailDiv.innerHTML = '获取菜谱详情失败:<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+            }
+        }
+        function fetchRecipeDetailFromInput() { fetchRecipeDetail(document.getElementById('recipe-detail-id').value); }
+        
+        // --- 评价 ---
+        async function fetchReviews(recipeId) {
+            const reviewsDiv = document.getElementById('recipe-reviews-display');
+            const { response, data } = await apiCall(`${API_BASE_URL}/recipes/recipes/${recipeId}/reviews/`);
+            if (response.ok) {
+                reviewsDiv.innerHTML = data.results && data.results.length > 0
+                    ? '<ul>' + data.results.map(r => `<li><b>${r.user_username}</b> (${r.rating}★): ${r.comment || ''}</li>`).join('') + '</ul>'
+                    : '<p>暂无评价。</p>';
+            } else {
+                reviewsDiv.innerHTML = '<p class="error">加载评价失败。</p>';
+            }
+        }
+        async function addReview(e) {
+            e.preventDefault();
+            const form = e.target;
+            const recipeId = form.dataset.recipeId;
+            const data = {
+                rating: form['review-rating'].value,
+                comment: form['review-comment'].value
+            };
+            const { response, data: result } = await apiCall(`${API_BASE_URL}/recipes/recipes/${recipeId}/reviews/`, 'POST', data);
+            displayResult('add-review-result', response, result, '评价成功！');
+            if(response.ok) {
+                form.reset();
+                fetchReviews(recipeId); // Refresh reviews
+            }
         }
 
-        // 从输入框获取 ID 并调用 fetchRecipeDetail
-        function fetchRecipeDetailFromInput() {
-            const idInput = document.getElementById('recipe-detail-id');
-            const recipeId = parseInt(idInput.value, 10); // 确保是整数
-            fetchRecipeDetail(recipeId);
+        // --- 菜谱创建/编辑 ---
+        document.getElementById('create-recipe-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const ingredientsData = form['recipe-ingredients-data'].value.split('\n')
+                .map(line => line.trim().split(','))
+                .filter(parts => parts.length >= 3)
+                .map(parts => ({
+                    ingredient_id: parseInt(parts[0], 10),
+                    quantity: parseFloat(parts[1]),
+                    unit: parts[2].trim(),
+                    notes: (parts[3] || '').trim()
+                }));
+
+            const data = {
+                title: form['recipe-title'].value,
+                description: form['recipe-description'].value,
+                cooking_time_minutes: form['recipe-time'].value ? parseInt(form['recipe-time'].value) : null,
+                difficulty: form['recipe-difficulty'].value,
+                main_image_url: form['recipe-image'].value,
+                cuisine_type: form['recipe-cuisine'].value,
+                status: form['recipe-status'].value,
+                dietary_tags: form['recipe-dietary-tags'].value.split(',').map(s => parseInt(s.trim())).filter(Boolean),
+                ingredients_data: ingredientsData
+            };
+            
+            const method = editingRecipeId ? 'PATCH' : 'POST';
+            const url = editingRecipeId 
+                ? `${API_BASE_URL}/recipes/recipes/${editingRecipeId}/` 
+                : `${API_BASE_URL}/recipes/recipes/`;
+            
+            const { response, data: result } = await apiCall(url, method, data);
+            displayResult('create-recipe-result', response, result, `菜谱${editingRecipeId ? '更新' : '创建'}成功!`);
+            if(response.ok) {
+                form.reset();
+                editingRecipeId = null;
+                document.getElementById('edit-recipe-id').value = '';
+            }
+        });
+        async function loadRecipeForEdit() {
+            const recipeId = document.getElementById('edit-recipe-id').value;
+            if (!recipeId) { alert('请输入要编辑的菜谱ID'); return; }
+            const { response, data } = await apiCall(`${API_BASE_URL}/recipes/recipes/${recipeId}/`);
+            if (response.ok) {
+                editingRecipeId = recipeId;
+                const form = document.getElementById('create-recipe-form');
+                form['recipe-title'].value = data.title || '';
+                form['recipe-description'].value = data.description || '';
+                form['recipe-time'].value = data.cooking_time_minutes || '';
+                form['recipe-difficulty'].value = data.difficulty || '1';
+                form['recipe-image'].value = data.main_image_url || '';
+                form['recipe-cuisine'].value = data.cuisine_type || '';
+                form['recipe-status'].value = data.status || 'draft';
+                form['recipe-dietary-tags'].value = data.dietary_tags ? data.dietary_tags.map(t => t.id).join(', ') : '';
+                form['recipe-ingredients-data'].value = data.recipe_ingredients
+                    ? data.recipe_ingredients.map(i => `${i.ingredient_id},${i.quantity},${i.unit},${i.notes || ''}`).join('\n')
+                    : '';
+                alert(`菜谱 ${recipeId} 已加载到表单中。`);
+            } else {
+                alert(`加载菜谱 ${recipeId} 失败！`);
+                editingRecipeId = null;
+            }
+        }
+        
+        // --- 库存 ---
+        async function fetchInventory() {
+            const listDiv = document.getElementById('inventory-list');
+            listDiv.innerHTML = '正在加载库存...';
+            const { response, data } = await apiCall(`${API_BASE_URL}/users/inventory/`);
+            if (response.ok && data.results) {
+                listDiv.innerHTML = data.results.length > 0
+                    ? data.results.map(item => `
+                        <div class="list-item">
+                            <span><b>${item.ingredient_name} (ID: ${item.ingredient})</b> - 备注: ${item.notes || '无'}</span>
+                            <button class="delete-btn" onclick="deleteInventoryItem(${item.id})">删除</button>
+                        </div>`).join('')
+                    : '<p>库存为空。</p>';
+            } else {
+                listDiv.innerHTML = '<p class="error">加载库存失败。</p>';
+            }
+        }
+        document.getElementById('add-inventory-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const data = { ingredient: form['inv-ingredient-id'].value, notes: form['inv-notes'].value };
+            const { response, data: result } = await apiCall(`${API_BASE_URL}/users/inventory/`, 'POST', data);
+            displayResult('add-inventory-result', response, result, '添加成功！');
+            if(response.ok) { form.reset(); fetchInventory(); }
+        });
+        async function deleteInventoryItem(itemId) {
+            if (!confirm('确定要删除这个库存物品吗？')) return;
+            const { response } = await apiCall(`${API_BASE_URL}/users/inventory/${itemId}/`, 'DELETE');
+            if (response.ok) { alert('删除成功！'); fetchInventory(); }
+            else { alert('删除失败！'); }
         }
 
+        // --- 购物清单 ---
+        async function fetchShoppingList() {
+            const listDiv = document.getElementById('shopping-list');
+            listDiv.innerHTML = '正在加载购物清单...';
+            const { response, data } = await apiCall(`${API_BASE_URL}/users/shopping-list/`);
+            if (response.ok && data.results) {
+                listDiv.innerHTML = data.results.length > 0
+                    ? data.results.map(item => `
+                        <div class="list-item">
+                            <div>
+                                <input type="checkbox" onchange="updateShoppingListItem(${item.id}, this.checked)" ${item.is_purchased ? 'checked' : ''}>
+                                <label style="width: auto; font-weight: normal; text-decoration: ${item.is_purchased ? 'line-through' : 'none'};">
+                                    <b>${item.ingredient_name}</b> - ${item.quantity || ''} ${item.unit || ''}
+                                </label>
+                            </div>
+                            <button class="delete-btn" onclick="deleteShoppingListItem(${item.id})">删除</button>
+                        </div>`).join('')
+                    : '<p>购物清单为空。</p>';
+            } else {
+                listDiv.innerHTML = '<p class="error">加载购物清单失败。</p>';
+            }
+        }
+        document.getElementById('add-shopping-item-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = e.target;
+            const data = {
+                ingredient: form['shop-ingredient-id'].value,
+                quantity: form['shop-quantity'].value,
+                unit: form['shop-unit'].value
+            };
+            const { response, data: result } = await apiCall(`${API_BASE_URL}/users/shopping-list/`, 'POST', data);
+            displayResult('add-shopping-item-result', response, result, '添加成功！');
+            if(response.ok) { form.reset(); fetchShoppingList(); }
+        });
+        async function updateShoppingListItem(itemId, isPurchased) {
+            const { response } = await apiCall(`${API_BASE_URL}/users/shopping-list/${itemId}/`, 'PATCH', { is_purchased: isPurchased });
+            if (response.ok) fetchShoppingList(); // Refresh list to show change
+            else alert('更新购买状态失败！');
+        }
+        async function deleteShoppingListItem(itemId) {
+            if (!confirm('确定要删除这个购物项吗？')) return;
+            const { response } = await apiCall(`${API_BASE_URL}/users/shopping-list/${itemId}/`, 'DELETE');
+            if (response.ok) { alert('删除成功！'); fetchShoppingList(); }
+            else { alert('删除失败！'); }
+        }
 
         // --- 页面加载时执行 ---
         document.addEventListener('DOMContentLoaded', () => {
-            // 检查是否有 token，决定显示哪个 section
             const accessToken = getAccessToken();
+            setTokens(accessToken, localStorage.getItem('refresh_token')); // Initialize UI based on stored token
             if (accessToken) {
-                 document.getElementById('current-token-status').textContent = `当前登录状态：已登录 (Access Token: ${accessToken.substring(0, 30)}...)`;
-                 document.getElementById('profile-nav-button').classList.remove('hidden');
-                 document.getElementById('recipes-nav-button').classList.remove('hidden');
-                 document.getElementById('logout-button').classList.remove('hidden');
-                showSection('profile-section'); // 如果已登录，默认显示个人资料
-                 fetchProfile(); // 自动加载个人资料
-                 fetchRecipes(); // 自动加载菜谱列表
-            } else {
-                showSection('register-section'); // 如果未登录，默认显示注册
+                fetchProfile();
             }
         });
-
     </script>
 </body>
 </html>
