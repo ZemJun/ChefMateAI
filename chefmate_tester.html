@@ -34,6 +34,8 @@
             display: inline-block;
         }
         button:hover, .button-like:hover { background-color: #0056b3; }
+        button.action-btn { background-color: #28a745; } /* 绿色动作按钮 */
+        button.action-btn:hover { background-color: #218838; }
         button.delete-btn { background-color: #dc3545; }
         button.delete-btn:hover { background-color: #c82333; }
         button.edit-btn { background-color: #ffc107; color: #212529;}
@@ -47,6 +49,7 @@
         img { max-width: 150px; height: auto; vertical-align: middle; margin-right: 10px; border-radius: 4px; }
         .list-item { border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between; align-items: center;}
         .list-item:last-child { border-bottom: none; }
+        .match-score { color: #17a2b8; font-style: italic; font-size: 0.9em; margin-left: 10px;}
     </style>
 </head>
 <body>
@@ -85,7 +88,7 @@
     <section id="login-section" class="hidden">
         <h2>用户登录</h2>
         <form id="login-form">
-            <div><label for="login-username">用户名/邮箱:</label><input type="text" id="login-username" required></div>
+            <div><label for="login-username">用户名:</label><input type="text" id="login-username" required></div>
             <div><label for="login-password">密码:</label><input type="password" id="login-password" required></div>
             <button type="submit">登录</button>
         </form>
@@ -118,7 +121,7 @@
         <div>
             <h3>筛选菜谱</h3>
             <form id="recipe-filter-form">
-                 <div><label for="filter-ingredients">手头食材 (ID, 逗号分隔):</label><input type="text" id="filter-ingredients" placeholder="例如：1,5"></div>
+                 <div><label for="filter-ingredients">手头食材 (ID, 逗号分隔):</label><input type="text" id="filter-ingredients" placeholder="例如：1,5 (将按匹配度排序)"></div>
                  <div><label for="filter-exclude">不吃食材 (ID, 逗号分隔):</label><input type="text" id="filter-exclude" placeholder="例如：3,7"></div>
                  <div><label for="filter-time">最长烹饪时间 (分钟):</label><input type="number" id="filter-time" placeholder="例如：30"></div>
                  <div><label for="filter-difficulty">难度 (1, 2, 3):</label><input type="number" id="filter-difficulty" min="1" max="3" placeholder="例如：1"></div>
@@ -329,17 +332,26 @@
             recipesListDiv.innerHTML = '正在加载菜谱...';
             const queryParams = new URLSearchParams(Object.fromEntries(Object.entries(filterParams).filter(([_, v]) => v != null && v !== '')));
             const { response, data } = await apiCall(`${API_BASE_URL}/recipes/recipes/?${queryParams.toString()}`);
-            if (response.ok && data.results) {
-                if (data.results.length > 0) {
-                    recipesListDiv.innerHTML = '<h3>菜谱列表:</h3>' + data.results.map(recipe => `
+            
+            // 后端分页后，数据在 data.results 里
+            const recipes = data.results || data; 
+
+            if (response.ok) {
+                if (Array.isArray(recipes) && recipes.length > 0) {
+                    recipesListDiv.innerHTML = '<h3>菜谱列表:</h3>' + recipes.map(recipe => {
+                        const matchScoreHtml = recipe.match_score !== undefined && recipe.match_score !== null
+                            ? `<span class="match-score">(匹配度: ${(recipe.match_score * 100).toFixed(0)}%)</span>`
+                            : '';
+                        return `
                         <div class="list-item">
                             <div>
                                 <img src="${recipe.main_image_url || 'https://via.placeholder.com/100x80?text=No+Image'}" alt="${recipe.title}">
                                 <span><b>${recipe.title} (ID: ${recipe.id})</b> by ${recipe.author_username || 'N/A'}</span>
+                                ${matchScoreHtml}
                             </div>
                             <button onclick="fetchRecipeDetail(${recipe.id})">查看详情</button>
                         </div>
-                    `).join('');
+                    `}).join('');
                 } else {
                     recipesListDiv.innerHTML = '没有找到符合条件的菜谱。';
                 }
@@ -370,11 +382,17 @@
                 let ingredientsHtml = data.recipe_ingredients && data.recipe_ingredients.length > 0
                     ? data.recipe_ingredients.map(item => `<li>${item.ingredient_name}: ${item.quantity || ''} ${item.unit || ''} ${item.notes ? `(${item.notes})` : ''}</li>`).join('')
                     : '<li>无食材信息。</li>';
+                
+                // 【新功能】加入购物单按钮
+                const addToShoppingListButton = getAccessToken() 
+                    ? `<button class="action-btn" onclick="addToShoppingList(${recipeId})">一键添加缺少食材到购物单</button><div id="add-to-list-result" class="result"></div>`
+                    : '<p><em>登录后可一键添加至购物单。</em></p>';
 
                 detailDiv.innerHTML = `
                     <h3>${data.title} (ID: ${data.id})</h3>
                     <p>作者: ${data.author_username || 'N/A'}</p>
                     <h4>所需食材:</h4><ul>${ingredientsHtml}</ul>
+                    ${addToShoppingListButton}
                     <hr>
                     <h4>评价</h4>
                     <div id="recipe-reviews-display">正在加载评价...</div>
@@ -393,6 +411,14 @@
             }
         }
         function fetchRecipeDetailFromInput() { fetchRecipeDetail(document.getElementById('recipe-detail-id').value); }
+        
+        // ---【新功能】一键加入购物清单 ---
+        async function addToShoppingList(recipeId) {
+            const { response, data } = await apiCall(`${API_BASE_URL}/recipes/recipes/${recipeId}/add_to_shopping_list/`, 'POST');
+            const resultDiv = document.getElementById('add-to-list-result');
+            const resultClass = response.ok ? 'success' : 'error';
+            resultDiv.innerHTML = `<p class="${resultClass}">${data.detail || JSON.stringify(data)}</p>`;
+        }
         
         // --- 评价 ---
         async function fetchReviews(recipeId) {
@@ -570,6 +596,8 @@
             setTokens(accessToken, localStorage.getItem('refresh_token')); // Initialize UI based on stored token
             if (accessToken) {
                 fetchProfile();
+            } else {
+                showSection('login-section');
             }
         });
     </script>
