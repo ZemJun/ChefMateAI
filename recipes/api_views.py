@@ -171,6 +171,27 @@ class RecipeViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED
         )
 
+    @action(detail=True, methods=['post', 'delete'], permission_classes=[permissions.IsAuthenticated])
+    def favorite(self, request, pk=None):
+        """用户收藏或取消收藏菜谱"""
+        recipe = self.get_object()
+        user = request.user
+
+        if request.method == 'POST':
+            if recipe in user.favorite_recipes.all():
+                return Response({'detail': '已经收藏过了。'}, status=status.HTTP_400_BAD_REQUEST)
+            user.favorite_recipes.add(recipe)
+            return Response({'status': 'favorited'}, status=status.HTTP_200_OK)
+        
+        elif request.method == 'DELETE':
+            if recipe not in user.favorite_recipes.all():
+                return Response({'detail': '尚未收藏。'}, status=status.HTTP_400_BAD_REQUEST)
+            user.favorite_recipes.remove(recipe)
+            return Response({'status': 'unfavorited'}, status=status.HTTP_204_NO_CONTENT)
+    def get_serializer_context(self):
+        """确保 request 对象被传递到 serializer context 中"""
+        return {'request': self.request}
+
 
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
@@ -216,3 +237,5 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         # 为确保能直接运行，暂时返回简化数据
         substitute_data = [{"id": s.id, "name": s.name} for s in substitutes]
         return Response(substitute_data)
+    
+    

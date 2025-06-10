@@ -96,10 +96,11 @@ class UserInventoryItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserInventoryItem
         fields = ('id', 'ingredient', 'ingredient_name', 'notes', 'added_at')
-        read_only_fields = ('id', 'added_at', 'user')
-        extra_kwargs = {
-            'ingredient': {'write_only': True}
-        }
+        read_only_fields = ('id', 'added_at', 'user', 'ingredient_name')
+
+        # extra_kwargs = {
+        #     'ingredient': {'write_only': True}
+        # }
 
 class ShoppingListItemSerializer(serializers.ModelSerializer):
     """购物清单项目序列化器"""

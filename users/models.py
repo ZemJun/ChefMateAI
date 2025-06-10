@@ -2,12 +2,7 @@
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.conf import settings # 用于引用 AUTH_USER_MODEL
-
-# 从 recipes.models 导入所有需要的模型
-# 如果 recipes.models 还没有 DietaryPreferenceTag 或 Recipe，请确保它们已定义
-# 假设 recipes.models 中已经定义了 Ingredient, DietaryPreferenceTag, Recipe
-from recipes.models import Ingredient, DietaryPreferenceTag, Recipe 
+from django.conf import settings
 
 class User(AbstractUser):
     nickname = models.CharField(max_length=100, blank=True, verbose_name="昵称")
@@ -25,6 +20,15 @@ class User(AbstractUser):
         verbose_name="不吃的食材",
         related_name="users_disliking"
     )
+    
+    # VVVVVVVVVVVVVVVVVV 新增字段 VVVVVVVVVVVVVVVVVV
+    favorite_recipes = models.ManyToManyField(
+        'recipes.Recipe',
+        blank=True,
+        verbose_name="收藏的菜谱",
+        related_name="favorited_by"
+    )
+    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     def __str__(self):
         return self.username
@@ -37,7 +41,7 @@ class UserInventoryItem(models.Model):
         verbose_name="用户"
     )
     ingredient = models.ForeignKey(
-        Ingredient, 
+        'recipes.Ingredient', 
         on_delete=models.CASCADE,
         verbose_name="食材"
     )
@@ -61,7 +65,7 @@ class ShoppingListItem(models.Model):
         verbose_name="用户"
     )
     ingredient = models.ForeignKey(
-        Ingredient, 
+        'recipes.Ingredient', 
         on_delete=models.CASCADE, 
         verbose_name="食材"
     )
@@ -71,7 +75,7 @@ class ShoppingListItem(models.Model):
     added_at = models.DateTimeField(auto_now_add=True, verbose_name="添加时间")
     
     related_recipe = models.ForeignKey(
-        Recipe,
+        'recipes.Recipe',
         on_delete=models.SET_NULL,
         blank=True,
         null=True,

@@ -85,8 +85,14 @@ class Recipe(models.Model):
         null=True,
         verbose_name="难度"
     )
-    main_image_url = models.URLField(blank=True, null=True, verbose_name="主图链接")
-
+    
+    main_image = models.ImageField(
+        upload_to='recipe_main_images/', 
+        blank=True, 
+        null=True, 
+        verbose_name="主图"
+    )
+    
     ingredients = models.ManyToManyField(
         Ingredient,
         through='RecipeIngredient',
@@ -136,7 +142,29 @@ class RecipeIngredient(models.Model):
         verbose_name="食材"
     )
     quantity = models.FloatField(verbose_name="用量")
-    unit = models.CharField(max_length=50, verbose_name="单位", help_text="例如：克, 个, 勺, 毫升, 杯")
+
+    # VVVVVVVV  这就是修改的核心 VVVVVVVV
+    UNIT_CHOICES = [
+        ('g', '克 (g)'),
+        ('kg', '千克 (kg)'),
+        ('ml', '毫升 (ml)'),
+        ('l', '升 (l)'),
+        ('tsp', '茶匙 (tsp)'),
+        ('tbsp', '汤匙 (tbsp)'),
+        ('cup', '杯 (cup)'),
+        ('piece', '个/只/颗'),
+        ('slice', '片'),
+        ('pinch', '撮'),
+        ('dash', '少量/几滴'),
+        ('to_taste', '适量'),
+    ]
+
+    unit = models.CharField(
+        max_length=10, 
+        choices=UNIT_CHOICES, 
+        default='g', # 提供一个默认值，'克' 是最常用的
+        verbose_name="单位"
+    )
     notes = models.CharField(max_length=255, blank=True, null=True, verbose_name="备注", help_text="例如：切碎, 去籽, 融化")
 
     def __str__(self):
@@ -178,3 +206,29 @@ class Review(models.Model):
         verbose_name_plural = "菜谱评价"
         unique_together = ('recipe', 'user')
         ordering = ['-created_at']
+        
+        
+class RecipeStep(models.Model):
+    recipe = models.ForeignKey(
+        Recipe,
+        on_delete=models.CASCADE,
+        related_name='steps',  # 使用 'steps' 作为反向关联名，更简洁
+        verbose_name="所属菜谱"
+    )
+    step_number = models.PositiveSmallIntegerField(verbose_name="步骤序号")
+    description = models.TextField(verbose_name="步骤描述")
+    image = models.ImageField(
+        upload_to='recipe_steps/', # 图片将上传到 media/recipe_steps/ 目录
+        blank=True, 
+        null=True, 
+        verbose_name="步骤图片 (可选)"
+    )
+
+    class Meta:
+        verbose_name = "菜谱步骤"
+        verbose_name_plural = "菜谱步骤"
+        ordering = ['step_number'] # 确保步骤总是按序号排序
+        unique_together = ('recipe', 'step_number') # 同一菜谱的步骤序号不能重复
+
+    def __str__(self):
+        return f"{self.recipe.title} - 步骤 {self.step_number}"

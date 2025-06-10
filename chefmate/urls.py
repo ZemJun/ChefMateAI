@@ -6,6 +6,9 @@ from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
+from django.conf import settings
+from django.conf.urls.static import static
+
 # ---配置 Schema View ---
 schema_view = get_schema_view(
    openapi.Info(
@@ -38,4 +41,6 @@ urlpatterns = [
     # 原始的 swagger.json 文件
     path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     
-]
+]# 在开发环境下，让 Django 能够提供媒体文件服务
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
