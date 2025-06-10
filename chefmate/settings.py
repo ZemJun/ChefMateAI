@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,13 +21,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-fm5pekip4!j0*m=m^b_p#fz_2joz87giroq6^zx(wpu53b+7l="
+SECRET_KEY = config('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
-
+# ALLOWED_HOSTS 从 .env 读取，并解析成列表
+# default 值用于当 .env 中没有这个变量时
+ALLOWED_HOSTS_str = config('ALLOWED_HOSTS', default='127.0.0.1,localhost')
+ALLOWED_HOSTS = [host.strip() for host in ALLOWED_HOSTS_str.split(',')]
 
 # Application definition
 
@@ -45,14 +48,15 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist', # 如果需要支持token吊销/刷新后旧token失效
-    'corsheaders'
+    'corsheaders',
+    'drf_yasg',
 ]
 
 AUTH_USER_MODEL = 'users.User'
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    'corsheaders.middleware.CorsMiddleware', # <--- 添加这一行
+    'corsheaders.middleware.CorsMiddleware', 
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -87,12 +91,12 @@ WSGI_APPLICATION = "chefmate.wsgi.application"
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',  # 告诉 Django 我们用的是 PostgreSQL
-        'NAME': 'chefmate_db',                      # 你在 pgAdmin 中创建的数据库名字
-        'USER': 'chefmate_user',                    # 你在 pgAdmin 中创建的数据库用户名
-        'PASSWORD': 'admin',                        # 上面那个用户的密码
-        'HOST': 'localhost',                        # 数据库服务器地址，本地一般是 localhost 或 127.0.0.1
-        'PORT': '5432',                             # PostgreSQL 的默认端口号
+        'ENGINE': config('DB_ENGINE', default='django.db.backends.postgresql'),
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='5432', cast=int),
     }
 }
 
@@ -142,8 +146,6 @@ REST_FRAMEWORK = {
     # 默认的认证方式：优先使用 JWTAuthentication
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        # 如果需要，可以添加其他认证方式，比如 SessionAuthentication 用于浏览器直接访问API
-        # 'rest_framework.authentication.SessionAuthentication', 
     ),
     # 默认的权限策略：可以设置为默认需要认证才能访问API
     'DEFAULT_PERMISSION_CLASSES': [
@@ -157,17 +159,11 @@ REST_FRAMEWORK = {
     # 默认的渲染器和解析器
     'DEFAULT_RENDERER_CLASSES': [
         'rest_framework.renderers.JSONRenderer', # 默认只支持JSON
-        'rest_framework.renderers.BrowsableAPIRenderer', # 如果希望在浏览器中看到可浏览的API界面
+        'rest_framework.renderers.BrowsableAPIRenderer',
     ],
     'DEFAULT_PARSER_CLASSES': [
         'rest_framework.parsers.JSONParser',
     ]
-    
-# DEFAULT_AUTHENTICATION_CLASSES: 定义了 API 请求过来时，DRF 会尝试哪些认证方法。我们将其设置为优先使用 JWTAuthentication。
-# DEFAULT_PERMISSION_CLASSES: 定义了访问 API 的默认权限。IsAuthenticated 表示用户必须登录 (即提供有效的 JWT) 才能访问。对于某些公开的 API (比如获取菜谱列表)，我们可以在具体的视图 (View) 中覆盖这个默认设置。
-# DEFAULT_PAGINATION_CLASS 和 PAGE_SIZE: 如果你的 API 端点返回的是一个列表数据（比如菜谱列表），DRF 可以自动处理分页。这里设置了默认的分页方式和每页大小。
-# DEFAULT_RENDERER_CLASSES 和 DEFAULT_PARSER_CLASSES: 通常 DRF 的默认设置（JSONRenderer, BrowsableAPIRenderer, JSONParser）已经够用，所以这里注释掉了，除非你有特殊需求。BrowsableAPIRenderer 非常有用，它能让在浏览器中直接访问 API 时看到一个友好的、可交互的界面。    
-
 }
 
 from datetime import timedelta
