@@ -1,46 +1,75 @@
-# chefmate\urls.py
-from django.contrib import admin
-from django.urls import path, include # 确保导入 include
+# chefmate/urls.py (最终版本)
 
+from django.contrib import admin
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from django.conf import settings
+from django.conf.urls.static import static
+
+# 导入所有你需要用到的 API 视图
+from users import api_views as user_api_views
+from recipes import api_views as recipe_api_views
+
+# 导入 simplejwt 的视图
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
+
+# 导入 drf-yasg 的视图
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
 
-from django.conf import settings
-from django.conf.urls.static import static
-
-# ---配置 Schema View ---
+# --- 配置 Schema View ---
 schema_view = get_schema_view(
    openapi.Info(
       title="ChefMate AI API",
       default_version='v1',
-      description="个性化菜谱生成与智能购物清单助手 (ChefMate AI) 的官方 API 文档",
-      terms_of_service="https://www.google.com/policies/terms/", # 替换成你自己的服务条款URL
-      contact=openapi.Contact(email="contact@chefmate.local"), # 替换成你的联系邮箱
-      license=openapi.License(name="BSD License"), # 替换成你项目的许可证
+      description="...",
+      contact=openapi.Contact(email="contact@chefmate.local"),
+      license=openapi.License(name="BSD License"),
    ),
    public=True,
    permission_classes=(permissions.AllowAny,),
 )
 
+
+# 创建一个唯一的、顶级的 API Router
+router = DefaultRouter()
+
+# 在这个唯一的 router 中注册所有 ViewSet
+router.register(r'users/inventory', user_api_views.UserInventoryViewSet, basename='inventory')
+router.register(r'users/shopping-list', user_api_views.ShoppingListItemViewSet, basename='shopping-list')
+router.register(r'recipes', recipe_api_views.RecipeViewSet, basename='recipe')
+router.register(r'ingredients', recipe_api_views.IngredientViewSet, basename='ingredient')
+
+
+# 定义 urlpatterns
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # 为我们的 users 应用的 API 设置路由
-    path('api/users/', include('users.api_urls')), 
-    # 为我们的 recipes 应用的 API 设置路由
-    path('api/recipes/', include('recipes.api_urls')), 
-    # 测试路由 
-    # path('recipes/',include('recipes.urls'))
     
-    # --- 文档路由  ---
+    # --- 将所有非 router 管理的 API 路径放在这里 ---
+    path('api/users/register/', user_api_views.UserRegistrationView.as_view(), name='register'),
+    path('api/users/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/users/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/users/profile/', user_api_views.UserProfileView.as_view(), name='profile'),
     
-    # Swagger UI 界面
+    path('api/dietary-tags/', recipe_api_views.DietaryPreferenceTagListView.as_view(), name='dietary-tag-list'),
+    
+    # 手动定义 reviews 的路径
+    path('api/recipes/<int:recipe_pk>/reviews/', recipe_api_views.ReviewViewSet.as_view({'get': 'list', 'post': 'create'}), name='recipe-reviews-list'),
+    path('api/recipes/<int:recipe_pk>/reviews/<int:pk>/', recipe_api_views.ReviewViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='recipe-reviews-detail'),
+
+    # --- 包含由顶级 router 生成的所有 URL ---
+    # 这会创建: /api/users/inventory/, /api/recipes/, /api/recipes/<pk>/ 等
+    path('api/', include(router.urls)),
+    
+    # --- 文档路由 ---
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
-    # Redoc UI 界面
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
-    # 原始的 swagger.json 文件
-    path('swagger.json', schema_view.without_ui(cache_timeout=0), name='schema-json'),
-    
-]# 在开发环境下，让 Django 能够提供媒体文件服务
+]
+
+# 在开发环境下，让 Django 能够提供媒体文件服务
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
