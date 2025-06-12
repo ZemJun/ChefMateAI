@@ -56,7 +56,7 @@ urlpatterns = [
     path('api/users/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/users/profile/', user_api_views.UserProfileView.as_view(), name='profile'),
     
-    # 新的简化菜谱列表API
+    # 简化菜谱列表API
     path('api/recipes/simple-list/', RecipeSimpleListView.as_view(), name='recipe-simple-list'),
     
     path('api/dietary-tags/', recipe_api_views.DietaryPreferenceTagListView.as_view(), name='dietary-tag-list'),
@@ -65,8 +65,6 @@ urlpatterns = [
     path('api/recipes/<int:recipe_pk>/reviews/', recipe_api_views.ReviewViewSet.as_view({'get': 'list', 'post': 'create'}), name='recipe-reviews-list'),
     path('api/recipes/<int:recipe_pk>/reviews/<int:pk>/', recipe_api_views.ReviewViewSet.as_view({'get': 'retrieve', 'put': 'update', 'patch': 'partial_update', 'delete': 'destroy'}), name='recipe-reviews-detail'),
 
-    # --- 包含由顶级 router 生成的所有 URL ---
-    # 这会创建: /api/users/inventory/, /api/recipes/, /api/recipes/<pk>/ 等
     path('api/', include(router.urls)),
     
     # --- 文档路由 ---

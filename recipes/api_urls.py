@@ -11,7 +11,7 @@ router.register(r'recipes', api_views.RecipeViewSet, basename='recipe')
 router.register(r'ingredients', api_views.IngredientViewSet, basename='ingredient')
 
 urlpatterns = [
-    # 包含 /recipes/, /recipes/<pk>/, /ingredients/ 等
+
     path('', include(router.urls)),
     
     # 单独为 dietary-tags 定义路径

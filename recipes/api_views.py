@@ -18,7 +18,7 @@ from .api_serializers import (
     RecipeDetailSerializer,
     RecipeCreateUpdateSerializer,
     ReviewSerializer,
-    RecipeSimpleSerializer # <--- 导入新的序列化器
+    RecipeSimpleSerializer 
 )
 from .permissions import IsOwnerOrReadOnly
 
@@ -240,5 +240,5 @@ class RecipeSimpleListView(generics.ListAPIView):
     """
     queryset = Recipe.objects.filter(status='published').order_by('title')
     serializer_class = RecipeSimpleSerializer
-    permission_classes = [permissions.IsAuthenticated] # 假设只有登录用户可以浏览
+    permission_classes = [permissions.IsAuthenticated] # 只有登录用户可以浏览
     pagination_class = None

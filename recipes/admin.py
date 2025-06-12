@@ -23,7 +23,6 @@ class RecipeStepInline(admin.TabularInline):
     model = RecipeStep
     extra = 1
     ordering = ('step_number',)
-    # 如果希望在步骤中也能方便地上传图片
     fields = ('step_number', 'description', 'image')
 
 
@@ -38,7 +37,7 @@ class RecipeAdmin(admin.ModelAdmin):
 
     fieldsets = (
         (None, {
-            'fields': ('title', 'author', 'description', 'main_image') # 使用新的 main_image 字段
+            'fields': ('title', 'author', 'description', 'main_image') 
         }),
         ('Details', {
             'fields': ('cooking_time_minutes', 'difficulty', 'cuisine_type', 'dietary_tags')
@@ -71,7 +70,6 @@ class ReviewAdmin(admin.ModelAdmin):
         return "-"
     comment_summary.short_description = "评论摘要"
 
-# 如果你希望直接在Admin中管理步骤，可以注册RecipeStep模型
 @admin.register(RecipeStep)
 class RecipeStepAdmin(admin.ModelAdmin):
     list_display = ('recipe', 'step_number', 'description')

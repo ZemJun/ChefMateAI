@@ -32,7 +32,7 @@ admin.site.register(User, UserAdmin)
 @admin.register(UserInventoryItem)
 class UserInventoryItemAdmin(admin.ModelAdmin):
     list_display = ('user', 'ingredient', 'notes', 'added_at')
-    list_filter = ('user', 'ingredient__name') # 按食材名称过滤会更直观
+    list_filter = ('user', 'ingredient__name') # 按食材名称过滤更直观
     search_fields = ('user__username', 'ingredient__name', 'notes')
     autocomplete_fields = ['user', 'ingredient']
     date_hierarchy = 'added_at' # 添加日期层级导航

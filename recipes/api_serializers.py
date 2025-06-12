@@ -10,13 +10,13 @@ class IngredientSubstituteSerializer(serializers.ModelSerializer):
         model = Ingredient
         fields = ('id', 'name', 'category', 'description')
 
-# VVVVVV 这是本次修改的核心 VVVVVV
+
 class IngredientSerializer(serializers.ModelSerializer):
     """
     食材的完整序列化器，现在包含分类的显示名称。
     """
     common_substitutes = IngredientSubstituteSerializer(many=True, read_only=True)
-    # 新增字段，用于获取人类可读的分类名称
+    # 用于获取人类可读的分类名称
     category_display = serializers.SerializerMethodField()
 
     class Meta:
@@ -27,9 +27,9 @@ class IngredientSerializer(serializers.ModelSerializer):
         )
     
     def get_category_display(self, obj):
-        # 调用模型实例上的 get_FOO_display 方法
+
         return obj.get_category_display()
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 
 class DietaryPreferenceTagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -188,4 +188,4 @@ class RecipeSimpleSerializer(serializers.ModelSerializer):
     """用于菜谱选择的极简序列化器"""
     class Meta:
         model = Recipe
-        fields = ('id', 'title', 'cuisine_type') # <--- 添加 cuisine_type
+        fields = ('id', 'title', 'cuisine_type') 

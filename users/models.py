@@ -21,14 +21,14 @@ class User(AbstractUser):
         related_name="users_disliking"
     )
     
-    # VVVVVVVVVVVVVVVVVV 新增字段 VVVVVVVVVVVVVVVVVV
+
     favorite_recipes = models.ManyToManyField(
         'recipes.Recipe',
         blank=True,
         verbose_name="收藏的菜谱",
         related_name="favorited_by"
     )
-    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 
     def __str__(self):
         return self.username

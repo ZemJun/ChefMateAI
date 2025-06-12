@@ -11,11 +11,11 @@ class Ingredient(models.Model):
         ('meat', '肉类'),            # （包括红肉：猪、牛、羊等）
         ('poultry', '禽类'),          # （鸡、鸭、鹅等）
         ('seafood', '海鲜'),
-        ('egg', '蛋类'),             # <-- 新增 (从 dairy 中分离)
+        ('egg', '蛋类'),             #  (从 dairy 中分离)
         ('dairy', '乳制品'),          # （牛奶、奶酪、黄油等，不含蛋）
-        ('mushroom', '菌菇'),         # <-- 新增 (从 vegetable 中分离)
-        ('legume', '豆类'),           # <-- 新增 (如黄豆、绿豆、扁豆、鹰嘴豆、毛豆等)
-        ('nut_seed', '坚果与籽类'),   # <-- 新增 (花生、核桃、杏仁、芝麻、瓜子等)
+        ('mushroom', '菌菇'),         #  (从 vegetable 中分离)
+        ('legume', '豆类'),           #  (如黄豆、绿豆、扁豆、鹰嘴豆、毛豆等)
+        ('nut_seed', '坚果与籽类'),   #  (花生、核桃、杏仁、芝麻、瓜子等)
         ('grain', '谷物/主食'),      # （米、面、燕麦、玉米等）
         ('spice', '香料/调料'),      # （非新鲜香草的干香料、酱料等）
         ('herb', '香草'),           # （新鲜或干的植物叶、花、茎，如薄荷、罗勒、香菜）
@@ -25,7 +25,7 @@ class Ingredient(models.Model):
     category = models.CharField(
         max_length=50,
         choices=CATEGORY_CHOICES,
-        blank=True, # 允许为空，如果某些食材初期难以分类
+        blank=True, # 允许为空
         null=True,  # 数据库中也允许为空
         verbose_name="分类"
     )
