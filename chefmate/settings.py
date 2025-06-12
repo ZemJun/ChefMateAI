@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     # My Apps
+    'django_extensions',
     'users.apps.UsersConfig',
     'recipes.apps.RecipesConfig', # 新增 recipes 应用
 
@@ -133,27 +134,31 @@ STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
-    # 默认的认证方式：优先使用 JWTAuthentication
+    # 默认的认证方式
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
-    # 默认的权限策略：可以设置为默认需要认证才能访问API
+    # 默认的权限策略
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated', # 默认需要认证
-        # 或者 'rest_framework.permissions.AllowAny', # 默认允许任何人访问 (不推荐全局设置)
+        'rest_framework.permissions.IsAuthenticated',
     ],
-    # 默认的分页设置 (如果API返回列表数据)
+    # 默认的分页设置
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10, # 每页默认显示10条记录
+    'PAGE_SIZE': 10,
     
-    # 默认的渲染器和解析器
+    # 默认的渲染器
     'DEFAULT_RENDERER_CLASSES': [
-        'rest_framework.renderers.JSONRenderer', # 默认只支持JSON
+        'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
     ],
+    
+    # vvvvvvvvvvvvvvvvvvvv 这是需要修改的地方 vvvvvvvvvvvvvvvvvvvv
     'DEFAULT_PARSER_CLASSES': [
-        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.JSONParser',          # 继续支持 JSON 数据
+        'rest_framework.parsers.FormParser',          # 支持 application/x-www-form-urlencoded
+        'rest_framework.parsers.MultiPartParser'      # <--- 核心：添加这个来支持 multipart/form-data (文件上传)
     ]
+    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 }
 
 from datetime import timedelta

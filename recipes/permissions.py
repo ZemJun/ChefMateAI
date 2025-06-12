@@ -1,3 +1,4 @@
+# ChefMateAI\recipes\permissions.py
 from rest_framework import permissions
 
 class IsOwnerOrReadOnly(permissions.BasePermission):

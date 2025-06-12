@@ -1,4 +1,4 @@
-# ChefMateAI/recipes/api_views.py
+# ChefMateAI/recipes/api_views.py (最终版)
 
 from rest_framework import generics, permissions, viewsets, status
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -10,7 +10,7 @@ from django.db.models import Count, Q, F, FloatField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from rest_framework import serializers
 from .models import Ingredient, DietaryPreferenceTag, Recipe, RecipeIngredient, Review
-from users.models import UserInventoryItem, ShoppingListItem # 导入用户模型
+from users.models import UserInventoryItem, ShoppingListItem
 from .api_serializers import (
     IngredientSerializer,
     DietaryPreferenceTagSerializer,
@@ -43,13 +43,7 @@ class DietaryPreferenceTagListView(generics.ListAPIView):
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
-    """
-    提供菜谱的列表、详情、创建、更新和删除接口。
-    - 支持基于多种条件的筛选。
-    - 支持基于持有食材的智能推荐排序。
-    - 支持一键将缺少食材加入购物清单。
-    """
-    queryset = Recipe.objects.filter(status='published').select_related('author').prefetch_related(
+    queryset = Recipe.objects.all().select_related('author').prefetch_related(
         'dietary_tags',
         'recipeingredient_set__ingredient'
     )
@@ -67,17 +61,27 @@ class RecipeViewSet(viewsets.ModelViewSet):
     ordering = ['-updated_at']
 
     def get_serializer_class(self):
-        if self.action == 'list':
+        if self.action == 'list' or self.action == 'favorites': # 让 favorites action 也用 ListSerializer
             return RecipeListSerializer
         if self.action in ['create', 'update', 'partial_update']:
             return RecipeCreateUpdateSerializer
         return RecipeDetailSerializer
 
     def get_queryset(self):
-        # 注意：原有的 available_ingredients 过滤逻辑已被移至 list 方法中进行智能排序
-        queryset = super().get_queryset()
+        queryset = self.queryset
         user = self.request.user
 
+        if user.is_authenticated:
+            queryset = queryset.filter(
+                Q(status='published') | Q(author=user)
+            )
+        else:
+            queryset = queryset.filter(status='published')
+
+        if user.is_authenticated and user.disliked_ingredients.exists():
+            user_disliked_ids = list(user.disliked_ingredients.values_list('id', flat=True))
+            queryset = queryset.exclude(ingredients__id__in=user_disliked_ids)
+            
         exclude_ingredients_str = self.request.query_params.get('exclude_ingredients')
         if exclude_ingredients_str:
             exclude_ingredient_ids = []
@@ -89,23 +93,15 @@ class RecipeViewSet(viewsets.ModelViewSet):
             if exclude_ingredient_ids:
                 queryset = queryset.exclude(ingredients__id__in=exclude_ingredient_ids)
 
-        if user.is_authenticated:
-            user_disliked_ids = list(user.disliked_ingredients.values_list('id', flat=True))
-            if user_disliked_ids:
-                queryset = queryset.exclude(ingredients__id__in=user_disliked_ids)
-
         return queryset.distinct()
 
     def list(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
         available_ingredients_str = request.query_params.get('available_ingredients')
         
-        # 当这个参数被显式传递时，我们才进行智能排序
         if available_ingredients_str is not None:
-            available_ingredient_ids = []
-            # 如果参数为空字符串，说明用户点击了按钮但没选食材，应返回空
             if not available_ingredients_str:
-                queryset = queryset.none() # <-- 直接返回空查询集
+                queryset = queryset.none()
             else:
                 try:
                     id_list = [s for s in available_ingredients_str.split(',') if s.strip()]
@@ -122,13 +118,9 @@ class RecipeViewSet(viewsets.ModelViewSet):
                             F('matched_ingredients') * 1.0 / F('total_ingredients'),
                             output_field=FloatField()
                         )
-                    )
-                    # 只显示至少匹配一个食材的菜谱
-                    queryset = queryset.filter(total_ingredients__gt=0, match_score__gt=0).order_by('-match_score', '-updated_at')
+                    ).filter(total_ingredients__gt=0, match_score__gt=0).order_by('-match_score', '-updated_at')
                 else:
-                    # 如果解析后id列表为空（例如输入是",,"），也返回空
                     queryset = queryset.none()
-
 
         page = self.paginate_queryset(queryset)
         if page is not None:
@@ -143,65 +135,52 @@ class RecipeViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def add_to_shopping_list(self, request, pk=None):
-        """
-        将当前菜谱中用户缺少的食材添加到购物清单。
-        API端点: POST /api/recipes/recipes/{pk}/add_to_shopping_list/
-        """
         recipe = self.get_object()
         user = request.user
-        
         required_ingredients = RecipeIngredient.objects.filter(recipe=recipe)
         required_ingredient_ids = required_ingredients.values_list('ingredient_id', flat=True)
         inventory_ingredient_ids = UserInventoryItem.objects.filter(user=user).values_list('ingredient_id', flat=True)
         shopping_list_ingredient_ids = ShoppingListItem.objects.filter(user=user).values_list('ingredient_id', flat=True)
-        
         needed_ingredient_ids = set(required_ingredient_ids) - set(inventory_ingredient_ids) - set(shopping_list_ingredient_ids)
-        
         if not needed_ingredient_ids:
             return Response({"detail": "太棒了！该菜谱所需食材您都已拥有或已在购物清单中。"}, status=status.HTTP_200_OK)
-            
-        items_to_create = []
-        ingredients_with_details = required_ingredients.filter(ingredient_id__in=needed_ingredient_ids)
-        
-        for item in ingredients_with_details:
-            items_to_create.append(
-                ShoppingListItem(
-                    user=user,
-                    ingredient_id=item.ingredient_id,
-                    quantity=item.quantity,
-                    unit=item.unit,
-                    related_recipe=recipe
-                )
-            )
-            
+        items_to_create = [
+            ShoppingListItem(
+                user=user,
+                ingredient_id=item.ingredient_id,
+                quantity=item.quantity,
+                unit=item.unit,
+                related_recipe=recipe
+            ) for item in required_ingredients.filter(ingredient_id__in=needed_ingredient_ids)
+        ]
         ShoppingListItem.objects.bulk_create(items_to_create)
-        
-        return Response(
-            {"detail": f"成功将 {len(items_to_create)} 种缺少的食材添加到了您的购物清单。"},
-            status=status.HTTP_201_CREATED
-        )
+        return Response({"detail": f"成功将 {len(items_to_create)} 种缺少的食材添加到了您的购物清单。"}, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post', 'delete'], permission_classes=[permissions.IsAuthenticated])
     def favorite(self, request, pk=None):
-        """用户收藏或取消收藏菜谱"""
         recipe = self.get_object()
         user = request.user
-
         if request.method == 'POST':
-            if recipe in user.favorite_recipes.all():
-                return Response({'detail': '已经收藏过了。'}, status=status.HTTP_400_BAD_REQUEST)
             user.favorite_recipes.add(recipe)
             return Response({'status': 'favorited'}, status=status.HTTP_200_OK)
-        
         elif request.method == 'DELETE':
-            if recipe not in user.favorite_recipes.all():
-                return Response({'detail': '尚未收藏。'}, status=status.HTTP_400_BAD_REQUEST)
             user.favorite_recipes.remove(recipe)
             return Response({'status': 'unfavorited'}, status=status.HTTP_204_NO_CONTENT)
-    def get_serializer_context(self):
-        """确保 request 对象被传递到 serializer context 中"""
-        return {'request': self.request}
 
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def favorites(self, request):
+        """返回当前用户收藏的所有菜谱。"""
+        user = request.user
+        favorited_recipes = user.favorite_recipes.all()
+        page = self.paginate_queryset(favorited_recipes)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(favorited_recipes, many=True)
+        return Response(serializer.data)
+
+    def get_serializer_context(self):
+        return {'request': self.request}
 
 class ReviewViewSet(viewsets.ModelViewSet):
     queryset = Review.objects.all()
@@ -240,12 +219,5 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     def substitutes(self, request, pk=None):
         ingredient = self.get_object()
         substitutes = ingredient.common_substitutes.all()
-        # 注意: 这里的序列化器在阶段一中并没有定义，如果需要请确保已定义
-        # from .api_serializers import IngredientSubstituteSerializer
-        # serializer = IngredientSubstituteSerializer(substitutes, many=True)
-        # return Response(serializer.data)
-        # 为确保能直接运行，暂时返回简化数据
         substitute_data = [{"id": s.id, "name": s.name} for s in substitutes]
         return Response(substitute_data)
-    
-    
