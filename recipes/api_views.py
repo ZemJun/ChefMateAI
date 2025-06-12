@@ -100,25 +100,35 @@ class RecipeViewSet(viewsets.ModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         available_ingredients_str = request.query_params.get('available_ingredients')
         
-        if available_ingredients_str:
+        # 当这个参数被显式传递时，我们才进行智能排序
+        if available_ingredients_str is not None:
             available_ingredient_ids = []
-            try:
-                id_list = [s for s in available_ingredients_str.split(',') if s.strip()]
-                available_ingredient_ids = [int(id_str.strip()) for id_str in id_list]
-            except ValueError:
-                return Response({"error": "无效的 available_ingredients 参数格式。应为逗号分隔的ID。"}, status=status.HTTP_400_BAD_REQUEST)
+            # 如果参数为空字符串，说明用户点击了按钮但没选食材，应返回空
+            if not available_ingredients_str:
+                queryset = queryset.none() # <-- 直接返回空查询集
+            else:
+                try:
+                    id_list = [s for s in available_ingredients_str.split(',') if s.strip()]
+                    available_ingredient_ids = [int(id_str.strip()) for id_str in id_list]
+                except ValueError:
+                    return Response({"error": "无效的 available_ingredients 参数格式。应为逗号分隔的ID。"}, status=status.HTTP_400_BAD_REQUEST)
 
-            if available_ingredient_ids:
-                queryset = queryset.annotate(
-                    total_ingredients=Coalesce(Count('ingredients', distinct=True), 0),
-                    matched_ingredients=Coalesce(Count('ingredients', filter=Q(ingredients__id__in=available_ingredient_ids), distinct=True), 0)
-                ).annotate(
-                    match_score=ExpressionWrapper(
-                        F('matched_ingredients') * 1.0 / F('total_ingredients'),
-                        output_field=FloatField()
+                if available_ingredient_ids:
+                    queryset = queryset.annotate(
+                        total_ingredients=Coalesce(Count('ingredients', distinct=True), 0),
+                        matched_ingredients=Coalesce(Count('ingredients', filter=Q(ingredients__id__in=available_ingredient_ids), distinct=True), 0)
+                    ).annotate(
+                        match_score=ExpressionWrapper(
+                            F('matched_ingredients') * 1.0 / F('total_ingredients'),
+                            output_field=FloatField()
+                        )
                     )
-                )
-                queryset = queryset.filter(total_ingredients__gt=0, match_score__gt=0).order_by('-match_score', '-updated_at')
+                    # 只显示至少匹配一个食材的菜谱
+                    queryset = queryset.filter(total_ingredients__gt=0, match_score__gt=0).order_by('-match_score', '-updated_at')
+                else:
+                    # 如果解析后id列表为空（例如输入是",,"），也返回空
+                    queryset = queryset.none()
+
 
         page = self.paginate_queryset(queryset)
         if page is not None:

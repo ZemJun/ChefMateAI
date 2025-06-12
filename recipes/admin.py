@@ -1,3 +1,4 @@
+# ChefMateAI\recipes\admin.py
 from django.contrib import admin
 from .models import Ingredient, DietaryPreferenceTag, Recipe, RecipeIngredient, Review, RecipeStep
 
