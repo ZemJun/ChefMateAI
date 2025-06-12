@@ -164,7 +164,7 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),      # Access Token 的有效期 (例如: 60 分钟)
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=120),      # Access Token 的有效期 (例如: 120 分钟)
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),        # Refresh Token 的有效期 (例如: 1 天)
     'ROTATE_REFRESH_TOKENS': True,                      # 每次使用 Refresh Token 刷新 Access Token 时，是否也返回一个新的 Refresh Token
     'BLACKLIST_AFTER_ROTATION': True,                   # 如果 ROTATE_REFRESH_TOKENS 为 True, 是否将旧的 Refresh Token 加入黑名单

@@ -6,7 +6,7 @@ class Ingredient(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="食材名称")
 
     CATEGORY_CHOICES = [
-        ('vegetable', '蔬菜'),        # （保留，但部分内容会移到新分类）
+        ('vegetable', '蔬菜'),
         ('fruit', '水果'),
         ('meat', '肉类'),            # （包括红肉：猪、牛、羊等）
         ('poultry', '禽类'),          # （鸡、鸭、鹅等）
