@@ -1,4 +1,4 @@
-# ChefMateAI/recipes/api_views.py (最终版)
+# recipes/api_views.py (最终版)
 
 from rest_framework import generics, permissions, viewsets, status
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
@@ -17,7 +17,8 @@ from .api_serializers import (
     RecipeListSerializer,
     RecipeDetailSerializer,
     RecipeCreateUpdateSerializer,
-    ReviewSerializer
+    ReviewSerializer,
+    RecipeSimpleSerializer # <--- 导入新的序列化器
 )
 from .permissions import IsOwnerOrReadOnly
 
@@ -207,9 +208,17 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    提供所有食材的只读接口。
+    关闭了分页，以便前端选择器可以获取完整列表。
+    """
     queryset = Ingredient.objects.all()
     serializer_class = IngredientSerializer
     permission_classes = [permissions.AllowAny]
+    
+    # 核心：关闭这个视图集的分页功能
+    pagination_class = None 
+    
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['name', 'category', 'description']
     ordering_fields = ['name', 'category']
@@ -219,5 +228,17 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     def substitutes(self, request, pk=None):
         ingredient = self.get_object()
         substitutes = ingredient.common_substitutes.all()
-        substitute_data = [{"id": s.id, "name": s.name} for s in substitutes]
-        return Response(substitute_data)
+        # 为了保持一致性，使用序列化器
+        serializer = self.get_serializer(substitutes, many=True)
+        return Response(serializer.data)
+
+
+class RecipeSimpleListView(generics.ListAPIView):
+    """
+    提供一个简化的菜谱列表(仅ID和标题)，用于前端选择。
+    此视图不分页。
+    """
+    queryset = Recipe.objects.filter(status='published').order_by('title')
+    serializer_class = RecipeSimpleSerializer
+    permission_classes = [permissions.IsAuthenticated] # 假设只有登录用户可以浏览
+    pagination_class = None

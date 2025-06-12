@@ -9,6 +9,7 @@ from django.conf.urls.static import static
 # 导入所有你需要用到的 API 视图
 from users import api_views as user_api_views
 from recipes import api_views as recipe_api_views
+from recipes.api_views import RecipeSimpleListView # <--- 导入新的视图
 
 # 导入 simplejwt 的视图
 from rest_framework_simplejwt.views import (
@@ -54,6 +55,9 @@ urlpatterns = [
     path('api/users/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/users/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/users/profile/', user_api_views.UserProfileView.as_view(), name='profile'),
+    
+    # 新的简化菜谱列表API
+    path('api/recipes/simple-list/', RecipeSimpleListView.as_view(), name='recipe-simple-list'),
     
     path('api/dietary-tags/', recipe_api_views.DietaryPreferenceTagListView.as_view(), name='dietary-tag-list'),
     

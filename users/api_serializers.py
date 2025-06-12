@@ -4,7 +4,7 @@ from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from .models import User, UserInventoryItem, ShoppingListItem
-from recipes.models import DietaryPreferenceTag, Ingredient
+from recipes.models import DietaryPreferenceTag, Ingredient, RecipeIngredient # <--- 确保导入 RecipeIngredient
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
@@ -98,23 +98,46 @@ class UserInventoryItemSerializer(serializers.ModelSerializer):
         fields = ('id', 'ingredient', 'ingredient_name', 'notes', 'added_at')
         read_only_fields = ('id', 'added_at', 'user', 'ingredient_name')
 
-        # extra_kwargs = {
-        #     'ingredient': {'write_only': True}
-        # }
 
 class ShoppingListItemSerializer(serializers.ModelSerializer):
     """购物清单项目序列化器"""
     ingredient_name = serializers.CharField(source='ingredient.name', read_only=True)
+    # 新增：食材分类代码 (用于逻辑)
+    ingredient_category = serializers.CharField(source='ingredient.category', read_only=True, allow_null=True)
+    # 新增：食材分类显示名称 (用于展示) - 依赖 models.py 里的 choices
+    ingredient_category_display = serializers.SerializerMethodField(read_only=True)
     related_recipe_title = serializers.CharField(source='related_recipe.title', read_only=True, allow_null=True)
-    
+    # 新增：显示单位文本
+    unit_display = serializers.SerializerMethodField(read_only=True)
+
+    def get_ingredient_category_display(self, obj):
+        try:
+            return obj.ingredient.get_category_display()
+        except AttributeError:
+            return "未知分类"
+            
+    def get_unit_display(self, obj):
+        if not obj.unit:
+            return ""
+        unit_choices_dict = dict(RecipeIngredient.UNIT_CHOICES)
+        return unit_choices_dict.get(obj.unit, obj.unit)
+
     class Meta:
         model = ShoppingListItem
         fields = (
-            'id', 'ingredient', 'ingredient_name', 'quantity', 'unit', 'is_purchased',
+            'id', 'ingredient', 'ingredient_name', 
+            'ingredient_category',
+            'ingredient_category_display',
+            'quantity', 'unit', 'unit_display',
+            'is_purchased',
             'related_recipe', 'related_recipe_title', 'added_at'
         )
-        read_only_fields = ('id', 'added_at', 'user')
+        read_only_fields = (
+            'id', 'added_at', 'user', 'ingredient_name', 
+            'ingredient_category', 'ingredient_category_display', 
+            'related_recipe_title', 'unit_display'
+        )
         extra_kwargs = {
-            'ingredient': {'write_only': True},
-            'related_recipe': {'write_only': True, 'required': False, 'allow_null': True}
+            'ingredient': {'required': True},
+            'related_recipe': {'required': False, 'allow_null': True}
         }

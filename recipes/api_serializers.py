@@ -1,4 +1,5 @@
 # recipes/api_serializers.py
+
 import json
 from rest_framework import serializers
 from .models import Ingredient, DietaryPreferenceTag, Recipe, RecipeIngredient, Review, RecipeStep
@@ -9,12 +10,26 @@ class IngredientSubstituteSerializer(serializers.ModelSerializer):
         model = Ingredient
         fields = ('id', 'name', 'category', 'description')
 
+# VVVVVV 这是本次修改的核心 VVVVVV
 class IngredientSerializer(serializers.ModelSerializer):
+    """
+    食材的完整序列化器，现在包含分类的显示名称。
+    """
     common_substitutes = IngredientSubstituteSerializer(many=True, read_only=True)
-    
+    # 新增字段，用于获取人类可读的分类名称
+    category_display = serializers.SerializerMethodField()
+
     class Meta:
         model = Ingredient
-        fields = ('id', 'name', 'category', 'description', 'image_url', 'common_substitutes')
+        fields = (
+            'id', 'name', 'category', 'category_display', 'description', 
+            'image_url', 'common_substitutes'
+        )
+    
+    def get_category_display(self, obj):
+        # 调用模型实例上的 get_FOO_display 方法
+        return obj.get_category_display()
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 class DietaryPreferenceTagSerializer(serializers.ModelSerializer):
     class Meta:
@@ -37,25 +52,23 @@ class RecipeIngredientSerializer(serializers.ModelSerializer):
         substitutes = obj.ingredient.common_substitutes.all()
         return IngredientSubstituteSerializer(substitutes, many=True).data
 
-# VVVVVV 新增的 Serializer VVVVVV
 class RecipeStepSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecipeStep
         fields = ('id', 'step_number', 'description', 'image')
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 class RecipeListSerializer(serializers.ModelSerializer):
     """用于菜谱列表，显示摘要信息"""
     author_username = serializers.CharField(source='author.username', read_only=True, allow_null=True)
     dietary_tags = DietaryPreferenceTagSerializer(many=True, read_only=True)
-    is_favorited = serializers.SerializerMethodField() # <--- 新增
+    is_favorited = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
         fields = (
             'id', 'title', 'main_image', 'author_username',
             'cooking_time_minutes', 'difficulty', 'cuisine_type',
-            'dietary_tags', 'description', 'is_favorited' # <--- 新增
+            'dietary_tags', 'description', 'is_favorited'
         )
         read_only_fields = fields
 
@@ -70,8 +83,8 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
     author_username = serializers.CharField(source='author.username', read_only=True, allow_null=True)
     recipe_ingredients = RecipeIngredientSerializer(source='recipeingredient_set', many=True, read_only=True)
     dietary_tags = DietaryPreferenceTagSerializer(many=True, read_only=True)
-    steps = RecipeStepSerializer(many=True, read_only=True) # <--- 新增
-    is_favorited = serializers.SerializerMethodField() # <--- 新增
+    steps = RecipeStepSerializer(many=True, read_only=True)
+    is_favorited = serializers.SerializerMethodField()
 
     class Meta:
         model = Recipe
@@ -80,7 +93,7 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
             'cooking_time_minutes', 'difficulty', 'main_image',
             'recipe_ingredients', 
             'dietary_tags', 'status', 'cuisine_type',
-            'steps', 'is_favorited' # <--- 新增
+            'steps', 'is_favorited'
         )
         read_only_fields = fields
 
@@ -90,7 +103,6 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
             return obj in user.favorite_recipes.all()
         return False
 
-# VVVVVV 大幅修改的 Serializer VVVVVV
 class RecipeIngredientCreateSerializer(serializers.ModelSerializer):
     """用于在创建菜谱时，接收食材数据的内部序列化器"""
     ingredient_id = serializers.IntegerField()
@@ -101,11 +113,9 @@ class RecipeIngredientCreateSerializer(serializers.ModelSerializer):
 
 class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
     """用于创建和更新菜谱的序列化器 (已优化)"""
-    # 将嵌套数据定义为 CharField 以接收 JSON 字符串
     ingredients_data = serializers.CharField(write_only=True)
     steps_data = serializers.CharField(write_only=True, required=False)
     
-    # dietary_tags 字段保持不变
     dietary_tags = serializers.PrimaryKeyRelatedField(
         queryset=DietaryPreferenceTag.objects.all(),
         many=True,
@@ -122,23 +132,18 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         )
 
     def create(self, validated_data):
-        # 解析 JSON 字符串
         ingredients_data = json.loads(validated_data.pop('ingredients_data'))
         steps_data = json.loads(validated_data.pop('steps_data', '[]'))
         dietary_tags = validated_data.pop('dietary_tags', [])
         
-        # 首先创建 Recipe 实例
         recipe = Recipe.objects.create(**validated_data)
         
-        # 设置多对多关系
         if dietary_tags:
             recipe.dietary_tags.set(dietary_tags)
 
-        # 批量创建 RecipeIngredient 实例
         recipe_ingredients = [RecipeIngredient(recipe=recipe, ingredient_id=data['ingredient_id'], quantity=data['quantity'], unit=data['unit'], notes=data.get('notes', '')) for data in ingredients_data]
         RecipeIngredient.objects.bulk_create(recipe_ingredients)
 
-        # 批量创建步骤
         recipe_steps = [RecipeStep(recipe=recipe, **data) for data in steps_data]
         if recipe_steps:
             RecipeStep.objects.bulk_create(recipe_steps)
@@ -146,31 +151,24 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         return recipe
 
     def update(self, instance, validated_data):
-        # 优化后的 update 方法，能健壮地处理 PATCH 请求
-
-        # 1. 处理嵌套的 JSON 字符串数据 (如果存在)
         if 'ingredients_data' in validated_data:
             ingredients_data = json.loads(validated_data.pop('ingredients_data'))
-            instance.recipeingredient_set.all().delete() # 先删除旧的
+            instance.recipeingredient_set.all().delete()
             recipe_ingredients = [RecipeIngredient(recipe=instance, ingredient_id=data['ingredient_id'], quantity=data['quantity'], unit=data['unit'], notes=data.get('notes', '')) for data in ingredients_data]
             RecipeIngredient.objects.bulk_create(recipe_ingredients)
 
         if 'steps_data' in validated_data:
             steps_data = json.loads(validated_data.pop('steps_data'))
-            instance.steps.all().delete() # 先删除旧的
+            instance.steps.all().delete()
             recipe_steps = [RecipeStep(recipe=instance, **data) for data in steps_data]
             if recipe_steps:
                 RecipeStep.objects.bulk_create(recipe_steps)
         
-        # 2. 处理 M2M 字段 (如果存在)
         if 'dietary_tags' in validated_data:
             dietary_tags_data = validated_data.pop('dietary_tags')
             instance.dietary_tags.set(dietary_tags_data)
 
-        # 3. 使用 DRF 的 super().update() 处理所有剩下的常规字段 (包括图片)
-        # 这是最安全和推荐的方式，它能正确处理部分更新
         return super().update(instance, validated_data)
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 class ReviewSerializer(serializers.ModelSerializer):
     """用于评价的创建、列表和详情"""
@@ -185,3 +183,9 @@ class ReviewSerializer(serializers.ModelSerializer):
         if not 1 <= value <= 5:
             raise serializers.ValidationError("评分必须在 1 到 5 之间。")
         return value
+
+class RecipeSimpleSerializer(serializers.ModelSerializer):
+    """用于菜谱选择的极简序列化器"""
+    class Meta:
+        model = Recipe
+        fields = ('id', 'title', 'cuisine_type') # <--- 添加 cuisine_type
