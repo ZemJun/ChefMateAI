@@ -57,7 +57,6 @@ source venv/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
-*(注意：您可能需要先通过 `pip freeze > requirements.txt` 命令在您的项目中生成此文件。)*
 
 ### 5. 配置环境变量
 
